@@ -15,10 +15,11 @@ export function FileUploader({ chatbotId }: FileUploaderProps) {
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setError("");
     setIsUploading(true);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     formData.set("chatbotId", chatbotId);
 
     const response = await fetch("/api/documents", {
@@ -30,7 +31,7 @@ export function FileUploader({ chatbotId }: FileUploaderProps) {
       const data = (await response.json()) as { error?: string };
       setError(data.error ?? "Upload failed.");
     } else {
-      event.currentTarget.reset();
+      form.reset();
       router.refresh();
     }
 
