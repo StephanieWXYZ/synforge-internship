@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { createChatbotAction } from "@/app/actions";
+import { CreateChatbotButton } from "@/components/CreateChatbotButton";
 
 export default function NewChatbotPage() {
   return (
@@ -68,12 +69,7 @@ export default function NewChatbotPage() {
             className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm leading-6"
           />
         </div>
-        <button
-          type="submit"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-blue-700 px-4 text-sm font-semibold text-white transition hover:bg-blue-800"
-        >
-          Create chatbot
-        </button>
+        <CreateChatbotButton />
       </form>
     </main>
   );
