@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { createChatbotAction } from "@/app/actions";
-import { CreateChatbotButton } from "@/components/CreateChatbotButton";
+import { CreateChatbotForm } from "@/components/CreateChatbotForm";
 
 export default function NewChatbotPage() {
   return (
@@ -18,59 +18,7 @@ export default function NewChatbotPage() {
         </p>
       </div>
 
-      <form action={createChatbotAction} className="mt-8 space-y-5 rounded-lg border border-slate-200 bg-white p-6">
-        <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="name">
-            Name
-          </label>
-          <input
-            id="name"
-            name="name"
-            required
-            placeholder="Real Estate Assistant"
-            className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="domain">
-            Domain/category
-          </label>
-          <input
-            id="domain"
-            name="domain"
-            required
-            placeholder="Real Estate"
-            className="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="description">
-            Description
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            required
-            rows={4}
-            placeholder="Answers questions about uploaded property documents, leases, inspections, and disclosures."
-            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm leading-6"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="systemPrompt">
-            System prompt/instructions
-          </label>
-          <textarea
-            id="systemPrompt"
-            name="systemPrompt"
-            required
-            rows={5}
-            defaultValue="Answer only from uploaded documents for this chatbot. If the uploaded files do not contain enough information, say you do not know based on the provided files. Keep answers concise and include practical next steps when supported by the documents."
-            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm leading-6"
-          />
-        </div>
-        <CreateChatbotButton />
-      </form>
+      <CreateChatbotForm action={createChatbotAction} />
     </main>
   );
 }
