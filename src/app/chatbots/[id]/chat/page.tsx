@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { ChatInterface } from "@/components/ChatInterface";
 import { db } from "@/lib/db";
+import { getSuggestedQuestions } from "@/lib/suggestedQuestions";
 
 type ChatPageProps = {
   params: Promise<{ id: string }>;
@@ -40,7 +41,10 @@ export default async function ChatPage({ params }: ChatPageProps) {
           </p>
         </div>
       </div>
-      <ChatInterface chatbotId={chatbot.id} />
+      <ChatInterface
+        chatbotId={chatbot.id}
+        suggestedQuestions={getSuggestedQuestions(chatbot.name, chatbot.domain)}
+      />
     </main>
   );
 }

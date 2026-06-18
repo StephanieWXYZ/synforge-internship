@@ -20,18 +20,18 @@ type ChatMessage = {
 
 type ChatInterfaceProps = {
   chatbotId: string;
+  suggestedQuestions: string[];
 };
 
-export function ChatInterface({ chatbotId }: ChatInterfaceProps) {
+export function ChatInterface({ chatbotId, suggestedQuestions }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState("");
   const [question, setQuestion] = useState("");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = question.trim();
+  async function sendQuestion(questionToSend: string) {
+    const trimmed = questionToSend.trim();
     if (!trimmed) {
       return;
     }
@@ -80,6 +80,11 @@ export function ChatInterface({ chatbotId }: ChatInterfaceProps) {
     setIsSending(false);
   }
 
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await sendQuestion(question);
+  }
+
   return (
     <div className="flex min-h-[620px] flex-col rounded-lg border border-slate-200 bg-white">
       <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
@@ -90,6 +95,21 @@ export function ChatInterface({ chatbotId }: ChatInterfaceProps) {
               <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
                 Questions are answered only from documents attached to this chatbot.
               </p>
+              {suggestedQuestions.length > 0 ? (
+                <div className="mt-5 grid gap-2 text-left sm:grid-cols-2">
+                  {suggestedQuestions.map((suggestedQuestion) => (
+                    <button
+                      key={suggestedQuestion}
+                      type="button"
+                      onClick={() => sendQuestion(suggestedQuestion)}
+                      disabled={isSending}
+                      className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm leading-5 text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      {suggestedQuestion}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : (
