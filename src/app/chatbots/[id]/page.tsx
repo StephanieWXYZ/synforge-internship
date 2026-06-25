@@ -15,7 +15,10 @@ export default async function ChatbotPage({ params }: ChatbotPageProps) {
   const chatbot = await db.chatbot.findUnique({
     where: { id },
     include: {
-      documents: { orderBy: { createdAt: "desc" } },
+      documents: {
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { chunks: true } } },
+      },
       _count: { select: { chunks: true } },
     },
   });
