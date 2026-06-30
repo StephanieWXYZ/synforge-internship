@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { chunkText } from "@/lib/chunking";
 import { db } from "@/lib/db";
+import { DOCUMENT_ERROR_MESSAGES } from "@/lib/documentErrors";
 import {
   isSupportedFile,
   MAX_FILE_SIZE,
@@ -35,7 +36,7 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
     const chunks = chunkText(text);
 
     if (chunks.length === 0) {
-      throw new Error("No readable text was found in the document.");
+      throw new Error(DOCUMENT_ERROR_MESSAGES.noReadableText);
     }
 
     for (const chunk of chunks) {
@@ -66,16 +67,16 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
 
 export async function saveAndProcessDocument(chatbotId: string, file: File) {
   if (!isSupportedFile(file)) {
-    throw new Error("Unsupported file type. Upload a PDF, TXT, or DOCX file.");
+    throw new Error(DOCUMENT_ERROR_MESSAGES.unsupportedFileType);
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error("File is too large. The MVP limit is 10 MB.");
+    throw new Error(DOCUMENT_ERROR_MESSAGES.fileTooLarge);
   }
 
   const chatbot = await db.chatbot.findUnique({ where: { id: chatbotId } });
   if (!chatbot) {
-    throw new Error("Chatbot not found.");
+    throw new Error(DOCUMENT_ERROR_MESSAGES.chatbotNotFound);
   }
 
   await mkdir(uploadRoot, { recursive: true });
@@ -103,11 +104,11 @@ export async function reprocessDocument(documentId: string) {
   const document = await db.document.findUnique({ where: { id: documentId } });
 
   if (!document) {
-    throw new Error("Document not found.");
+    throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
   }
 
   if (document.status !== "failed") {
-    throw new Error("Only failed documents can be reprocessed.");
+    throw new Error(DOCUMENT_ERROR_MESSAGES.reprocessOnlyFailed);
   }
 
   const buffer = await readFile(document.filePath);
@@ -118,7 +119,7 @@ export async function deleteDocument(documentId: string) {
   const document = await db.document.findUnique({ where: { id: documentId } });
 
   if (!document) {
-    throw new Error("Document not found.");
+    throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
   }
 
   try {

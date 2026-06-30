@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { deleteDocument, reprocessDocument } from "@/lib/documents";
+import { DOCUMENT_ERROR_MESSAGES } from "@/lib/documentErrors";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,7 @@ export async function DELETE(_request: Request, { params }: DocumentRouteContext
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Delete failed." },
+      { error: error instanceof Error ? error.message : DOCUMENT_ERROR_MESSAGES.deleteFailed },
       { status: 400 },
     );
   }
@@ -28,7 +29,7 @@ export async function PATCH(_request: Request, { params }: DocumentRouteContext)
     return NextResponse.json({ document });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Reprocess failed." },
+      { error: error instanceof Error ? error.message : DOCUMENT_ERROR_MESSAGES.reprocessFailed },
       { status: 400 },
     );
   }
