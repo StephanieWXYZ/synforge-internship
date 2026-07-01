@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, Search } from "lucide-react";
+import { FileText, RefreshCw, Search, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type DocumentListProps = {
   documents: Array<{
@@ -22,7 +23,14 @@ const statusClass: Record<string, string> = {
 };
 
 export function DocumentList({ documents }: DocumentListProps) {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [pendingAction, setPendingAction] = useState<{
+    documentId: string;
+    action: "delete" | "reprocess";
+  } | null>(null);
+
   const filteredDocuments = useMemo(() => {
     const normalizedSearchTerm = searchTerm.trim().toLowerCase();
 
@@ -34,6 +42,43 @@ export function DocumentList({ documents }: DocumentListProps) {
       document.fileName.toLowerCase().includes(normalizedSearchTerm),
     );
   }, [documents, searchTerm]);
+
+  async function deleteUploadedDocument(documentId: string, fileName: string) {
+    const shouldDelete = window.confirm(`Delete "${fileName}" and its chunks?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setActionError("");
+    setPendingAction({ documentId, action: "delete" });
+
+    const response = await fetch(`/api/documents/${documentId}`, { method: "DELETE" });
+
+    if (!response.ok) {
+      const data = (await response.json()) as { error?: string };
+      setActionError(data.error ?? "Delete failed.");
+    } else {
+      router.refresh();
+    }
+
+    setPendingAction(null);
+  }
+
+  async function reprocessUploadedDocument(documentId: string) {
+    setActionError("");
+    setPendingAction({ documentId, action: "reprocess" });
+
+    const response = await fetch(`/api/documents/${documentId}`, { method: "PATCH" });
+
+    if (!response.ok) {
+      const data = (await response.json()) as { error?: string };
+      setActionError(data.error ?? "Reprocess failed.");
+    } else {
+      router.refresh();
+    }
+
+    setPendingAction(null);
+  }
 
   if (documents.length === 0) {
     return (
@@ -71,6 +116,12 @@ export function DocumentList({ documents }: DocumentListProps) {
         </div>
       ) : null}
 
+      {actionError ? (
+        <div className="border-b border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {actionError}
+        </div>
+      ) : null}
+
       {filteredDocuments.map((document) => (
         <div
           key={document.id}
@@ -98,11 +149,44 @@ export function DocumentList({ documents }: DocumentListProps) {
               </dl>
             </div>
           </div>
-          <span
-            className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusClass[document.status]}`}
-          >
-            {document.status}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusClass[document.status]}`}
+            >
+              {document.status}
+            </span>
+            {document.status === "failed" ? (
+              <button
+                type="button"
+                onClick={() => reprocessUploadedDocument(document.id)}
+                disabled={pendingAction !== null}
+                className="inline-flex size-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                aria-label={`Reprocess ${document.fileName}`}
+                title="Reprocess document"
+              >
+                <RefreshCw
+                  size={16}
+                  aria-hidden="true"
+                  className={
+                    pendingAction?.documentId === document.id &&
+                    pendingAction.action === "reprocess"
+                      ? "animate-spin"
+                      : undefined
+                  }
+                />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => deleteUploadedDocument(document.id, document.fileName)}
+              disabled={pendingAction !== null}
+              className="inline-flex size-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+              aria-label={`Delete ${document.fileName}`}
+              title="Delete document"
+            >
+              <Trash2 size={16} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       ))}
     </div>
