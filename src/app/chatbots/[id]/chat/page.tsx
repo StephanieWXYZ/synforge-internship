@@ -8,18 +8,52 @@ import { getSuggestedQuestions } from "@/lib/suggestedQuestions";
 
 type ChatPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ conversation?: string }>;
 };
 
-export default async function ChatPage({ params }: ChatPageProps) {
+type MessageSource = {
+  fileName: string;
+  chunkIndex: number;
+  score?: number;
+};
+
+function parseSources(sourcesJson: string | null): MessageSource[] {
+  if (!sourcesJson) {
+    return [];
+  }
+
+  try {
+    const sources = JSON.parse(sourcesJson);
+    return Array.isArray(sources) ? sources : [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function ChatPage({ params, searchParams }: ChatPageProps) {
   const { id } = await params;
+  const { conversation: selectedConversationId } = await searchParams;
   const chatbot = await db.chatbot.findUnique({
     where: { id },
-    include: { _count: { select: { documents: true, chunks: true } } },
+    include: {
+      conversations: {
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { messages: true } } },
+      },
+      _count: { select: { documents: true, chunks: true } },
+    },
   });
 
   if (!chatbot) {
     notFound();
   }
+
+  const selectedConversation = selectedConversationId
+    ? await db.conversation.findFirst({
+        where: { id: selectedConversationId, chatbotId: chatbot.id },
+        include: { messages: { orderBy: { createdAt: "asc" } } },
+      })
+    : null;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 py-8 sm:px-8">
@@ -42,7 +76,23 @@ export default async function ChatPage({ params }: ChatPageProps) {
         </div>
       </div>
       <ChatInterface
+        key={selectedConversation?.id ?? "new-conversation"}
         chatbotId={chatbot.id}
+        conversations={chatbot.conversations.map((conversation) => ({
+          id: conversation.id,
+          title: conversation.title,
+          createdAt: conversation.createdAt,
+          messageCount: conversation._count.messages,
+        }))}
+        initialConversationId={selectedConversation?.id ?? ""}
+        initialMessages={
+          selectedConversation?.messages.map((message) => ({
+            id: message.id,
+            role: message.role === "assistant" ? "assistant" : "user",
+            content: message.content,
+            sources: parseSources(message.sourcesJson),
+          })) ?? []
+        }
         suggestedQuestions={getSuggestedQuestions(chatbot.name, chatbot.domain)}
       />
     </main>
