@@ -10,6 +10,7 @@ import { SourceReferences } from "@/components/SourceReferences";
 type Source = {
   fileName: string;
   chunkIndex: number;
+  preview?: string;
   score?: number;
 };
 

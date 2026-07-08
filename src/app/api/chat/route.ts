@@ -9,6 +9,15 @@ export const runtime = "nodejs";
 const insufficientAnswer =
   "I don't have enough information in the uploaded documents to answer that.";
 
+function buildSourcePreview(content: string) {
+  const preview = content.replace(/\s+/g, " ").trim();
+  if (preview.length <= 220) {
+    return preview;
+  }
+
+  return `${preview.slice(0, 217).trimEnd().replace(/[.,;:!?]+$/, "")}...`;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -39,6 +48,7 @@ export async function POST(request: Request) {
     const sources = chunks.map((chunk) => ({
       fileName: chunk.fileName,
       chunkIndex: chunk.chunkIndex,
+      preview: buildSourcePreview(chunk.content),
       score: chunk.score,
     }));
 
