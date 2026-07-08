@@ -3,11 +3,25 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { generateChatAnswer } from "@/lib/llm";
 import { buildContext, retrieveRelevantChunks } from "@/lib/retrieval";
+import { filterRelevantSources } from "@/lib/sourceFiltering";
 
 export const runtime = "nodejs";
 
 const insufficientAnswer =
   "I don't have enough information in the uploaded documents to answer that.";
+const SOURCE_PREVIEW_MAX_LENGTH = 220;
+const SOURCE_PREVIEW_ELLIPSIS = "...";
+
+function buildSourcePreview(content: string) {
+  const preview = content.replace(/\s+/g, " ").trim();
+  if (preview.length <= SOURCE_PREVIEW_MAX_LENGTH) {
+    return preview;
+  }
+
+  const previewTextLength = SOURCE_PREVIEW_MAX_LENGTH - SOURCE_PREVIEW_ELLIPSIS.length;
+
+  return `${preview.slice(0, previewTextLength).trimEnd().replace(/[.,;:!?]+$/, "")}${SOURCE_PREVIEW_ELLIPSIS}`;
+}
 
 export async function POST(request: Request) {
   try {
@@ -35,12 +49,7 @@ export async function POST(request: Request) {
       conversationId = conversation.id;
     }
 
-    const chunks = await retrieveRelevantChunks(chatbotId, question);
-    const sources = chunks.map((chunk) => ({
-      fileName: chunk.fileName,
-      chunkIndex: chunk.chunkIndex,
-      score: chunk.score,
-    }));
+    const chunks = filterRelevantSources(await retrieveRelevantChunks(chatbotId, question));
 
     await db.message.create({
       data: { conversationId, role: "user", content: question },
@@ -58,12 +67,22 @@ export async function POST(request: Request) {
             context: buildContext(chunks),
             question,
           });
+    const finalAnswer = answer || insufficientAnswer;
+    const sources =
+      finalAnswer === insufficientAnswer
+        ? []
+        : chunks.map((chunk) => ({
+            fileName: chunk.fileName,
+            chunkIndex: chunk.chunkIndex,
+            preview: buildSourcePreview(chunk.content),
+            score: chunk.score,
+          }));
 
     const assistantMessage = await db.message.create({
       data: {
         conversationId,
         role: "assistant",
-        content: answer || insufficientAnswer,
+        content: finalAnswer,
         sourcesJson: JSON.stringify(sources),
       },
     });

@@ -14,6 +14,7 @@ type ChatPageProps = {
 type MessageSource = {
   fileName: string;
   chunkIndex: number;
+  preview?: string;
   score?: number;
 };
 
