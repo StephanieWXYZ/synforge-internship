@@ -9,14 +9,18 @@ export const runtime = "nodejs";
 
 const insufficientAnswer =
   "I don't have enough information in the uploaded documents to answer that.";
+const SOURCE_PREVIEW_MAX_LENGTH = 220;
+const SOURCE_PREVIEW_ELLIPSIS = "...";
 
 function buildSourcePreview(content: string) {
   const preview = content.replace(/\s+/g, " ").trim();
-  if (preview.length <= 220) {
+  if (preview.length <= SOURCE_PREVIEW_MAX_LENGTH) {
     return preview;
   }
 
-  return `${preview.slice(0, 217).trimEnd().replace(/[.,;:!?]+$/, "")}...`;
+  const previewTextLength = SOURCE_PREVIEW_MAX_LENGTH - SOURCE_PREVIEW_ELLIPSIS.length;
+
+  return `${preview.slice(0, previewTextLength).trimEnd().replace(/[.,;:!?]+$/, "")}${SOURCE_PREVIEW_ELLIPSIS}`;
 }
 
 export async function POST(request: Request) {
