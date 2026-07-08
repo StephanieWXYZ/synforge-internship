@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { generateChatAnswer } from "@/lib/llm";
 import { buildContext, retrieveRelevantChunks } from "@/lib/retrieval";
+import { filterRelevantSources } from "@/lib/sourceFiltering";
 
 export const runtime = "nodejs";
 
@@ -44,13 +45,7 @@ export async function POST(request: Request) {
       conversationId = conversation.id;
     }
 
-    const chunks = await retrieveRelevantChunks(chatbotId, question);
-    const sources = chunks.map((chunk) => ({
-      fileName: chunk.fileName,
-      chunkIndex: chunk.chunkIndex,
-      preview: buildSourcePreview(chunk.content),
-      score: chunk.score,
-    }));
+    const chunks = filterRelevantSources(await retrieveRelevantChunks(chatbotId, question));
 
     await db.message.create({
       data: { conversationId, role: "user", content: question },
@@ -68,12 +63,22 @@ export async function POST(request: Request) {
             context: buildContext(chunks),
             question,
           });
+    const finalAnswer = answer || insufficientAnswer;
+    const sources =
+      finalAnswer === insufficientAnswer
+        ? []
+        : chunks.map((chunk) => ({
+            fileName: chunk.fileName,
+            chunkIndex: chunk.chunkIndex,
+            preview: buildSourcePreview(chunk.content),
+            score: chunk.score,
+          }));
 
     const assistantMessage = await db.message.create({
       data: {
         conversationId,
         role: "assistant",
-        content: answer || insufficientAnswer,
+        content: finalAnswer,
         sourcesJson: JSON.stringify(sources),
       },
     });
