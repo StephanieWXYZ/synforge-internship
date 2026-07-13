@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { ChatInterface } from "@/components/ChatInterface";
+import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getSuggestedQuestions } from "@/lib/suggestedQuestions";
 
@@ -32,12 +33,14 @@ function parseSources(sourcesJson: string | null): MessageSource[] {
 }
 
 export default async function ChatPage({ params, searchParams }: ChatPageProps) {
+  const user = await requireUser();
   const { id } = await params;
   const { conversation: selectedConversationId } = await searchParams;
-  const chatbot = await db.chatbot.findUnique({
-    where: { id },
+  const chatbot = await db.chatbot.findFirst({
+    where: { id, userId: user.id },
     include: {
       conversations: {
+        where: { userId: user.id },
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { messages: true } } },
       },
@@ -51,8 +54,8 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
 
   const selectedConversation = selectedConversationId
     ? await db.conversation.findFirst({
-        where: { id: selectedConversationId, chatbotId: chatbot.id },
-        include: { messages: { orderBy: { createdAt: "asc" } } },
+        where: { id: selectedConversationId, chatbotId: chatbot.id, userId: user.id },
+        include: { messages: { where: { userId: user.id }, orderBy: { createdAt: "asc" } } },
       })
     : null;
 

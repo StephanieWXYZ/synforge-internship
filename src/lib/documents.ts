@@ -15,6 +15,7 @@ const uploadRoot = path.join(process.cwd(), "uploads");
 
 type StoredDocument = {
   id: string;
+  userId: string | null;
   chatbotId: string;
   fileName: string;
   fileType: string;
@@ -44,6 +45,7 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
       await db.documentChunk.create({
         data: {
           documentId: document.id,
+          userId: document.userId,
           chatbotId: document.chatbotId,
           chunkIndex: chunk.chunkIndex,
           content: chunk.content,
@@ -65,7 +67,7 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
   }
 }
 
-export async function saveAndProcessDocument(chatbotId: string, file: File) {
+export async function saveAndProcessDocument(userId: string, chatbotId: string, file: File) {
   if (!isSupportedFile(file)) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.unsupportedFileType);
   }
@@ -74,7 +76,7 @@ export async function saveAndProcessDocument(chatbotId: string, file: File) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.fileTooLarge);
   }
 
-  const chatbot = await db.chatbot.findUnique({ where: { id: chatbotId } });
+  const chatbot = await db.chatbot.findFirst({ where: { id: chatbotId, userId } });
   if (!chatbot) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.chatbotNotFound);
   }
@@ -87,6 +89,7 @@ export async function saveAndProcessDocument(chatbotId: string, file: File) {
 
   const document = await db.document.create({
     data: {
+      userId,
       chatbotId,
       fileName: file.name,
       fileType: file.type || path.extname(file.name).slice(1),
@@ -100,8 +103,8 @@ export async function saveAndProcessDocument(chatbotId: string, file: File) {
   return processStoredDocument(document, buffer);
 }
 
-export async function reprocessDocument(documentId: string) {
-  const document = await db.document.findUnique({ where: { id: documentId } });
+export async function reprocessDocument(userId: string, documentId: string) {
+  const document = await db.document.findFirst({ where: { id: documentId, userId } });
 
   if (!document) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
@@ -115,8 +118,8 @@ export async function reprocessDocument(documentId: string) {
   return processStoredDocument(document, buffer);
 }
 
-export async function deleteDocument(documentId: string) {
-  const document = await db.document.findUnique({ where: { id: documentId } });
+export async function deleteDocument(userId: string, documentId: string) {
+  const document = await db.document.findFirst({ where: { id: documentId, userId } });
 
   if (!document) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
