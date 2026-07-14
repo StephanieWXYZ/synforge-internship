@@ -12,12 +12,13 @@ export type RetrievedChunk = {
 };
 
 export async function retrieveRelevantChunks(
+  userId: string,
   chatbotId: string,
   question: string,
   limit = 5,
 ): Promise<RetrievedChunk[]> {
   const chunks = await db.documentChunk.findMany({
-    where: { chatbotId },
+    where: { chatbotId, userId },
     include: { document: true },
   });
 

@@ -2,10 +2,13 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { ChatbotCard } from "@/components/ChatbotCard";
+import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export default async function Home() {
+  const user = await requireUser();
   const chatbots = await db.chatbot.findMany({
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { documents: true } } },
   });

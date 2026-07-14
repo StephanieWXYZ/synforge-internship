@@ -14,65 +14,107 @@ datasource db {
 
 model Chatbot {
   id           String         @id @default(cuid())
+  userId       String?
   name         String
   domain       String
   description  String
   systemPrompt String
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+  user         User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents    Document[]
   chunks       DocumentChunk[]
   conversations Conversation[]
+
+  @@index([userId])
 }
 
 model Document {
   id        String          @id @default(cuid())
+  userId    String?
   chatbotId String
   fileName  String
   fileType  String
   filePath  String
   status    String          @default("uploaded")
   createdAt DateTime        @default(now())
+  user      User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
   chatbot   Chatbot         @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
   chunks    DocumentChunk[]
 
+  @@index([userId])
   @@index([chatbotId])
 }
 
 model DocumentChunk {
   id         String   @id @default(cuid())
+  userId     String?
   documentId String
   chatbotId  String
   chunkIndex Int
   content    String
   embedding  String
   createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   chatbot    Chatbot  @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
 
   @@unique([documentId, chunkIndex])
+  @@index([userId])
   @@index([chatbotId])
 }
 
 model Conversation {
   id        String    @id @default(cuid())
+  userId    String?
   chatbotId String
   title     String
   createdAt DateTime  @default(now())
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   chatbot   Chatbot   @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
   messages  Message[]
 
+  @@index([userId])
   @@index([chatbotId])
 }
 
 model Message {
   id             String       @id @default(cuid())
+  userId         String?
   conversationId String
   role           String
   content        String
   sourcesJson    String?
   createdAt      DateTime     @default(now())
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@index([conversationId])
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  name         String
+  passwordHash String
+  passwordSalt String
+  createdAt    DateTime        @default(now())
+  chatbots     Chatbot[]
+  documents    Document[]
+  chunks       DocumentChunk[]
+  conversations Conversation[]
+  messages     Message[]
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

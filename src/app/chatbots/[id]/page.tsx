@@ -4,6 +4,7 @@ import { ArrowLeft, MessageSquareText } from "lucide-react";
 
 import { DocumentList } from "@/components/DocumentList";
 import { FileUploader } from "@/components/FileUploader";
+import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 type ChatbotPageProps = {
@@ -11,11 +12,13 @@ type ChatbotPageProps = {
 };
 
 export default async function ChatbotPage({ params }: ChatbotPageProps) {
+  const user = await requireUser();
   const { id } = await params;
-  const chatbot = await db.chatbot.findUnique({
-    where: { id },
+  const chatbot = await db.chatbot.findFirst({
+    where: { id, userId: user.id },
     include: {
       documents: {
+        where: { userId: user.id },
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { chunks: true } } },
       },
