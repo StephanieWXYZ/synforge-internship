@@ -10,6 +10,7 @@ import {
   parseDocument,
 } from "@/lib/documentParser";
 import { generateEmbedding } from "@/lib/llm";
+import { findDocumentForChatbot } from "@/lib/resourceValidation";
 
 const uploadRoot = path.join(process.cwd(), "uploads");
 
@@ -103,8 +104,8 @@ export async function saveAndProcessDocument(userId: string, chatbotId: string, 
   return processStoredDocument(document, buffer);
 }
 
-export async function reprocessDocument(userId: string, documentId: string) {
-  const document = await db.document.findFirst({ where: { id: documentId, userId } });
+export async function reprocessDocument(userId: string, chatbotId: string, documentId: string) {
+  const document = await findDocumentForChatbot(userId, chatbotId, documentId);
 
   if (!document) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
@@ -118,8 +119,8 @@ export async function reprocessDocument(userId: string, documentId: string) {
   return processStoredDocument(document, buffer);
 }
 
-export async function deleteDocument(userId: string, documentId: string) {
-  const document = await db.document.findFirst({ where: { id: documentId, userId } });
+export async function deleteDocument(userId: string, chatbotId: string, documentId: string) {
+  const document = await findDocumentForChatbot(userId, chatbotId, documentId);
 
   if (!document) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);

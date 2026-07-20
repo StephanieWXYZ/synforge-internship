@@ -3,26 +3,11 @@ import { NextResponse } from "next/server";
 import { authenticationErrorResponse, requireApiUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generateChatAnswer } from "@/lib/llm";
+import { buildRagResponse } from "@/lib/rag";
 import { buildContext, retrieveRelevantChunks } from "@/lib/retrieval";
-import { filterRelevantSources } from "@/lib/sourceFiltering";
+import { findConversationForChatbot } from "@/lib/resourceValidation";
 
 export const runtime = "nodejs";
-
-const insufficientAnswer =
-  "I don't have enough information in the uploaded documents to answer that.";
-const SOURCE_PREVIEW_MAX_LENGTH = 220;
-const SOURCE_PREVIEW_ELLIPSIS = "...";
-
-function buildSourcePreview(content: string) {
-  const preview = content.replace(/\s+/g, " ").trim();
-  if (preview.length <= SOURCE_PREVIEW_MAX_LENGTH) {
-    return preview;
-  }
-
-  const previewTextLength = SOURCE_PREVIEW_MAX_LENGTH - SOURCE_PREVIEW_ELLIPSIS.length;
-
-  return `${preview.slice(0, previewTextLength).trimEnd().replace(/[.,;:!?]+$/, "")}${SOURCE_PREVIEW_ELLIPSIS}`;
-}
 
 export async function POST(request: Request) {
   try {
@@ -51,50 +36,37 @@ export async function POST(request: Request) {
       });
       conversationId = conversation.id;
     } else {
-      const conversation = await db.conversation.findFirst({
-        where: { id: conversationId, chatbotId, userId: user.id },
-      });
+      const conversation = await findConversationForChatbot(user.id, chatbotId, conversationId);
 
       if (!conversation) {
         return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
       }
     }
 
-    const chunks = filterRelevantSources(await retrieveRelevantChunks(user.id, chatbotId, question));
+    const chunks = await retrieveRelevantChunks(user.id, chatbotId, question);
 
     await db.message.create({
       data: { userId: user.id, conversationId, role: "user", content: question },
     });
 
-    const answer =
-      chunks.length === 0
-        ? insufficientAnswer
-        : await generateChatAnswer({
-            systemPrompt: [
-              chatbot.systemPrompt,
-              `Domain: ${chatbot.domain}`,
-              `Description: ${chatbot.description}`,
-            ].join("\n"),
-            context: buildContext(chunks),
-            question,
-          });
-    const finalAnswer = answer || insufficientAnswer;
-    const sources =
-      finalAnswer === insufficientAnswer
-        ? []
-        : chunks.map((chunk) => ({
-            fileName: chunk.fileName,
-            chunkIndex: chunk.chunkIndex,
-            preview: buildSourcePreview(chunk.content),
-            score: chunk.score,
-          }));
+    const { answer, sources } = await buildRagResponse(chunks, () =>
+      generateChatAnswer({
+        systemPrompt: [
+          chatbot.systemPrompt,
+          `Domain: ${chatbot.domain}`,
+          `Description: ${chatbot.description}`,
+        ].join("\n"),
+        context: buildContext(chunks),
+        question,
+      }),
+    );
 
     const assistantMessage = await db.message.create({
       data: {
         userId: user.id,
         conversationId,
         role: "assistant",
-        content: finalAnswer,
+        content: answer,
         sourcesJson: JSON.stringify(sources),
       },
     });

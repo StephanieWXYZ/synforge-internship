@@ -82,7 +82,7 @@ export default async function ChatbotPage({ params }: ChatbotPageProps) {
 
       <section className="mt-8 grid gap-5 lg:grid-cols-[420px_1fr]">
         <FileUploader chatbotId={chatbot.id} />
-        <DocumentList documents={chatbot.documents} />
+        <DocumentList chatbotId={chatbot.id} documents={chatbot.documents} />
       </section>
     </main>
   );

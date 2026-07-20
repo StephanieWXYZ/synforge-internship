@@ -5,6 +5,7 @@ import { FileText, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type DocumentListProps = {
+  chatbotId: string;
   documents: Array<{
     id: string;
     fileName: string;
@@ -22,7 +23,7 @@ const statusClass: Record<string, string> = {
   failed: "bg-rose-100 text-rose-800",
 };
 
-export function DocumentList({ documents }: DocumentListProps) {
+export function DocumentList({ chatbotId, documents }: DocumentListProps) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [actionError, setActionError] = useState("");
@@ -52,7 +53,9 @@ export function DocumentList({ documents }: DocumentListProps) {
     setActionError("");
     setPendingAction({ documentId, action: "delete" });
 
-    const response = await fetch(`/api/documents/${documentId}`, { method: "DELETE" });
+    const response = await fetch(`/api/documents/${documentId}?chatbotId=${chatbotId}`, {
+      method: "DELETE",
+    });
 
     if (!response.ok) {
       const data = (await response.json()) as { error?: string };
@@ -68,7 +71,9 @@ export function DocumentList({ documents }: DocumentListProps) {
     setActionError("");
     setPendingAction({ documentId, action: "reprocess" });
 
-    const response = await fetch(`/api/documents/${documentId}`, { method: "PATCH" });
+    const response = await fetch(`/api/documents/${documentId}?chatbotId=${chatbotId}`, {
+      method: "PATCH",
+    });
 
     if (!response.ok) {
       const data = (await response.json()) as { error?: string };

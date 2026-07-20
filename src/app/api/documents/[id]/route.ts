@@ -10,11 +10,21 @@ type DocumentRouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function DELETE(_request: Request, { params }: DocumentRouteContext) {
+function getChatbotId(request: Request) {
+  return new URL(request.url).searchParams.get("chatbotId") ?? "";
+}
+
+export async function DELETE(request: Request, { params }: DocumentRouteContext) {
   try {
     const user = await requireApiUser();
     const { id } = await params;
-    await deleteDocument(user.id, id);
+    const chatbotId = getChatbotId(request);
+
+    if (!chatbotId) {
+      return NextResponse.json({ error: "chatbotId is required." }, { status: 400 });
+    }
+
+    await deleteDocument(user.id, chatbotId, id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const authResponse = authenticationErrorResponse(error);
@@ -29,11 +39,17 @@ export async function DELETE(_request: Request, { params }: DocumentRouteContext
   }
 }
 
-export async function PATCH(_request: Request, { params }: DocumentRouteContext) {
+export async function PATCH(request: Request, { params }: DocumentRouteContext) {
   try {
     const user = await requireApiUser();
     const { id } = await params;
-    const document = await reprocessDocument(user.id, id);
+    const chatbotId = getChatbotId(request);
+
+    if (!chatbotId) {
+      return NextResponse.json({ error: "chatbotId is required." }, { status: 400 });
+    }
+
+    const document = await reprocessDocument(user.id, chatbotId, id);
     return NextResponse.json({ document });
   } catch (error) {
     const authResponse = authenticationErrorResponse(error);
