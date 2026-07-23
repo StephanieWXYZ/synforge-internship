@@ -1,3 +1,8 @@
+import {
+  buildDocumentOnlySystemPrompt,
+  buildDocumentQuestionPrompt,
+} from "@/lib/rag";
+
 type ChatAnswerInput = {
   systemPrompt: string;
   context: string;
@@ -54,17 +59,11 @@ export async function generateChatAnswer(input: ChatAnswerInput): Promise<string
       messages: [
         {
           role: "system",
-          content: [
-            input.systemPrompt,
-            "You are a domain-specific document assistant.",
-            "Answer only with the uploaded document context provided.",
-            "If the context is insufficient, say exactly: I don't have enough information in the uploaded documents to answer that.",
-            "Do not invent facts. Keep answers practical and concise.",
-          ].join("\n"),
+          content: buildDocumentOnlySystemPrompt(input.systemPrompt),
         },
         {
           role: "user",
-          content: `Document context:\n${input.context}\n\nQuestion:\n${input.question}`,
+          content: buildDocumentQuestionPrompt(input.context, input.question),
         },
       ],
     }),
