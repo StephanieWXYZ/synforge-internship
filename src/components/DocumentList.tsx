@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileText, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -23,6 +23,13 @@ const statusClass: Record<string, string> = {
   failed: "bg-rose-100 text-rose-800",
 };
 
+const statusLabel: Record<string, string> = {
+  uploaded: "Processing document...",
+  processing: "Processing document...",
+  ready: "Ready",
+  failed: "Processing failed",
+};
+
 export function DocumentList({ chatbotId, documents }: DocumentListProps) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,6 +38,23 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
     documentId: string;
     action: "delete" | "reprocess";
   } | null>(null);
+  const hasActiveProcessingDocument = documents.some((document) =>
+    ["uploaded", "processing"].includes(document.status),
+  );
+
+  useEffect(() => {
+    if (!hasActiveProcessingDocument) {
+      return;
+    }
+
+    const refreshTimer = window.setInterval(() => {
+      router.refresh();
+    }, 2000);
+
+    return () => {
+      window.clearInterval(refreshTimer);
+    };
+  }, [hasActiveProcessingDocument, router]);
 
   const filteredDocuments = useMemo(() => {
     const normalizedSearchTerm = searchTerm.trim().toLowerCase();
@@ -53,9 +77,10 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
     setActionError("");
     setPendingAction({ documentId, action: "delete" });
 
-    const response = await fetch(`/api/documents/${documentId}?chatbotId=${chatbotId}`, {
-      method: "DELETE",
-    });
+    const response = await fetch(
+      `/api/documents/${documentId}?chatbotId=${encodeURIComponent(chatbotId)}`,
+      { method: "DELETE" },
+    );
 
     if (!response.ok) {
       const data = (await response.json()) as { error?: string };
@@ -71,9 +96,10 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
     setActionError("");
     setPendingAction({ documentId, action: "reprocess" });
 
-    const response = await fetch(`/api/documents/${documentId}?chatbotId=${chatbotId}`, {
-      method: "PATCH",
-    });
+    const response = await fetch(
+      `/api/documents/${documentId}?chatbotId=${encodeURIComponent(chatbotId)}`,
+      { method: "PATCH" },
+    );
 
     if (!response.ok) {
       const data = (await response.json()) as { error?: string };
@@ -87,14 +113,17 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
 
   if (documents.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-        No documents uploaded yet.
+      <div className="min-w-0 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+        <h2 className="font-semibold text-slate-950">No documents uploaded yet</h2>
+        <p className="mx-auto mt-2 max-w-sm leading-6">
+          Upload a PDF, TXT, or DOCX file to make this chatbot answer from your documents.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-100 p-4">
         <label className="block text-sm font-medium text-slate-700" htmlFor="document-search">
           Search documents
@@ -137,7 +166,7 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
               <FileText size={18} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <p className="truncate font-medium text-slate-950">{document.fileName}</p>
+              <p className="truncate break-all font-medium text-slate-950">{document.fileName}</p>
               <dl className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
                 <div className="flex gap-1">
                   <dt>Type:</dt>
@@ -158,7 +187,7 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
             <span
               className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusClass[document.status]}`}
             >
-              {document.status}
+              {statusLabel[document.status] ?? document.status}
             </span>
             {document.status === "failed" ? (
               <button

@@ -3,6 +3,37 @@ import { NextResponse } from "next/server";
 import { authenticationErrorResponse, requireApiUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+type ChatbotFieldErrors = {
+  name?: string;
+  domain?: string;
+  description?: string;
+  systemPrompt?: string;
+};
+
+function validateChatbotFields(input: {
+  name: string;
+  domain: string;
+  description: string;
+  systemPrompt: string;
+}) {
+  const fieldErrors: ChatbotFieldErrors = {};
+
+  if (!input.name) {
+    fieldErrors.name = "Name is required.";
+  }
+  if (!input.domain) {
+    fieldErrors.domain = "Domain/category is required.";
+  }
+  if (!input.description) {
+    fieldErrors.description = "Description is required.";
+  }
+  if (!input.systemPrompt) {
+    fieldErrors.systemPrompt = "System prompt/instructions are required.";
+  }
+
+  return fieldErrors;
+}
+
 export async function GET() {
   try {
     const user = await requireApiUser();
@@ -26,8 +57,12 @@ export async function POST(request: Request) {
     const description = String(body.description ?? "").trim();
     const systemPrompt = String(body.systemPrompt ?? "").trim();
 
-    if (!name || !domain || !description || !systemPrompt) {
-      return NextResponse.json({ error: "All chatbot fields are required." }, { status: 400 });
+    const fieldErrors = validateChatbotFields({ name, domain, description, systemPrompt });
+    if (Object.keys(fieldErrors).length > 0) {
+      return NextResponse.json(
+        { error: "Please fix the highlighted fields.", fieldErrors },
+        { status: 400 },
+      );
     }
 
     const chatbot = await db.chatbot.create({
