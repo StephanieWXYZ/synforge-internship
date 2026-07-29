@@ -4,8 +4,8 @@ import { ArrowLeft } from "lucide-react";
 
 import { ChatInterface } from "@/components/ChatInterface";
 import { requireUser } from "@/lib/auth";
+import { getSuggestedQuestions } from "@/lib/chatbotTemplates";
 import { db } from "@/lib/db";
-import { getSuggestedQuestions } from "@/lib/suggestedQuestions";
 
 type ChatPageProps = {
   params: Promise<{ id: string }>;
