@@ -21,6 +21,11 @@ type ChatMessage = {
   sources?: Source[];
 };
 
+type FailedResponse = {
+  conversationId: string;
+  userMessageId: string;
+};
+
 type ConversationSummary = {
   id: string;
   title: string;
@@ -49,15 +54,17 @@ export function ChatInterface({
   const [question, setQuestion] = useState("");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [failedResponse, setFailedResponse] = useState<FailedResponse | null>(null);
 
   async function sendQuestion(questionToSend: string) {
     const trimmed = questionToSend.trim();
-    if (!trimmed) {
+    if (!trimmed || isSending) {
       return;
     }
 
+    const optimisticMessageId = crypto.randomUUID();
     const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: optimisticMessageId,
       role: "user",
       content: trimmed,
     };
@@ -65,27 +72,59 @@ export function ChatInterface({
     setMessages((current) => [...current, userMessage]);
     setQuestion("");
     setError("");
+    setFailedResponse(null);
     setIsSending(true);
 
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatbotId, conversationId, question: trimmed }),
-    });
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatbotId, conversationId, question: trimmed }),
+      });
 
-    const data = (await response.json()) as {
-      error?: string;
-      conversationId?: string;
-      message?: { id: string; role: "assistant"; content: string };
-      sources?: Source[];
-    };
+      const data = (await response.json()) as {
+        error?: string;
+        conversationId?: string;
+        userMessage?: { id: string; role: "user"; content: string };
+        retryMessageId?: string;
+        message?: { id: string; role: "assistant"; content: string };
+        sources?: Source[];
+      };
 
-    const assistantMessage = data.message;
-
-    if (!response.ok || !assistantMessage) {
-      setError(data.error ?? "Message failed.");
-    } else {
       const nextConversationId = data.conversationId ?? conversationId;
+      if (data.userMessage) {
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === optimisticMessageId
+              ? { ...message, id: data.userMessage?.id ?? message.id }
+              : message,
+          ),
+        );
+      }
+
+      const assistantMessage = data.message;
+
+      if (!response.ok || !assistantMessage) {
+        setError(data.error ?? "Assistant response failed. Please retry.");
+
+        if (data.retryMessageId && nextConversationId) {
+          setConversationId(nextConversationId);
+          setFailedResponse({
+            conversationId: nextConversationId,
+            userMessageId: data.retryMessageId,
+          });
+          if (nextConversationId !== conversationId) {
+            router.replace(`/chatbots/${chatbotId}/chat?conversation=${nextConversationId}`);
+          }
+        } else {
+          setMessages((current) =>
+            current.filter((message) => message.id !== optimisticMessageId),
+          );
+          setQuestion(trimmed);
+        }
+        return;
+      }
+
       setConversationId(nextConversationId);
       setMessages((current) => [
         ...current,
@@ -100,9 +139,64 @@ export function ChatInterface({
         router.replace(`/chatbots/${chatbotId}/chat?conversation=${nextConversationId}`);
       }
       router.refresh();
+    } catch {
+      setMessages((current) => current.filter((message) => message.id !== optimisticMessageId));
+      setQuestion(trimmed);
+      setError("Message failed. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  async function retryAssistantResponse() {
+    if (!failedResponse || isSending) {
+      return;
     }
 
-    setIsSending(false);
+    setError("");
+    setIsSending(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatbotId,
+          conversationId: failedResponse.conversationId,
+          retryMessageId: failedResponse.userMessageId,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        error?: string;
+        conversationId?: string;
+        message?: { id: string; role: "assistant"; content: string };
+        sources?: Source[];
+      };
+
+      if (!response.ok || !data.message) {
+        setError(data.error ?? "Assistant response failed. Please retry.");
+        return;
+      }
+
+      const nextConversationId = data.conversationId ?? failedResponse.conversationId;
+      setConversationId(nextConversationId);
+      setMessages((current) => [
+        ...current,
+        {
+          id: data.message?.id ?? crypto.randomUUID(),
+          role: "assistant",
+          content: data.message?.content ?? "",
+          sources: data.sources ?? [],
+        },
+      ]);
+      setFailedResponse(null);
+      router.refresh();
+    } catch {
+      setError("Assistant response failed. Please retry.");
+    } finally {
+      setIsSending(false);
+    }
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -124,7 +218,10 @@ export function ChatInterface({
         </div>
         <div className="max-h-[540px] overflow-y-auto p-2">
           {conversations.length === 0 ? (
-            <p className="p-3 text-sm leading-6 text-slate-500">No conversations yet.</p>
+            <div className="p-3 text-sm leading-6 text-slate-500">
+              <p className="font-medium text-slate-700">No conversations yet</p>
+              <p className="mt-1">Ask a question to start the first conversation.</p>
+            </div>
           ) : (
             conversations.map((conversation) => (
               <Link
@@ -186,7 +283,7 @@ export function ChatInterface({
                       : "border border-slate-200 bg-slate-50 text-slate-800"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{message.content}</p>
+                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
                   {message.role === "assistant" ? (
                     <SourceReferences sources={message.sources ?? []} />
                   ) : null}
@@ -194,16 +291,30 @@ export function ChatInterface({
               </div>
             ))
           )}
-          {isSending ? <p className="text-sm text-slate-500">Searching documents...</p> : null}
+          {isSending ? <p className="text-sm text-slate-500">Answering...</p> : null}
         </div>
         <form onSubmit={onSubmit} className="border-t border-slate-200 p-4">
-          {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+          {error ? (
+            <div className="mb-3 rounded-md border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <p>{error}</p>
+              {failedResponse ? (
+                <button
+                  type="button"
+                  onClick={retryAssistantResponse}
+                  disabled={isSending}
+                  className="mt-3 inline-flex min-h-9 items-center justify-center rounded-md bg-rose-700 px-3 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-rose-300"
+                >
+                  Retry response
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex gap-3">
             <input
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
               placeholder="Ask a question..."
-              className="min-h-12 flex-1 rounded-md border border-slate-300 px-4 text-sm"
+              className="min-h-12 min-w-0 flex-1 rounded-md border border-slate-300 px-4 text-sm"
               disabled={isSending}
             />
             <button

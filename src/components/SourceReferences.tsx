@@ -17,7 +17,11 @@ function formatScore(score?: number) {
 
 export function SourceReferences({ sources }: SourceReferencesProps) {
   if (sources.length === 0) {
-    return null;
+    return (
+      <div className="mt-3 border-t border-slate-200 pt-3">
+        <p className="text-xs text-slate-500">No source references for this response.</p>
+      </div>
+    );
   }
 
   return (

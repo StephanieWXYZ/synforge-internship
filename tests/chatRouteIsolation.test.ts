@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   chatbotFindFirst: vi.fn(),
   conversationCreate: vi.fn(),
   messageCreate: vi.fn(),
+  messageFindFirst: vi.fn(),
   findConversationForChatbot: vi.fn(),
   retrieveRelevantChunks: vi.fn(),
   generateChatAnswer: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("@/lib/db", () => ({
     },
     message: {
       create: mocks.messageCreate,
+      findFirst: mocks.messageFindFirst,
     },
   },
 }));
@@ -85,5 +87,64 @@ describe("chat route isolation", () => {
     expect(mocks.messageCreate).not.toHaveBeenCalled();
     expect(mocks.retrieveRelevantChunks).not.toHaveBeenCalled();
     expect(mocks.generateChatAnswer).not.toHaveBeenCalled();
+  });
+
+  it("retries an existing user message without creating a duplicate user message", async () => {
+    mocks.messageFindFirst.mockResolvedValue({
+      id: "user-message-1",
+      conversationId: "conversation-b",
+      role: "user",
+      content: "How much is the monthly rent?",
+    });
+    mocks.findConversationForChatbot.mockResolvedValue({ id: "conversation-b" });
+    mocks.retrieveRelevantChunks.mockResolvedValue([
+      {
+        chunkId: "chunk-b",
+        documentId: "doc-b",
+        fileName: "lease.txt",
+        chunkIndex: 0,
+        content: "The monthly rent amount is $2,000.",
+        score: 0.9,
+      },
+    ]);
+    mocks.generateChatAnswer.mockResolvedValue("The monthly rent amount is $2,000.");
+    mocks.messageCreate.mockResolvedValue({
+      id: "assistant-message-1",
+      role: "assistant",
+      content: "The monthly rent amount is $2,000.",
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          chatbotId: "chatbot-b",
+          conversationId: "conversation-b",
+          retryMessageId: "user-message-1",
+        }),
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      conversationId: "conversation-b",
+      userMessage: {
+        id: "user-message-1",
+        role: "user",
+        content: "How much is the monthly rent?",
+      },
+      message: {
+        id: "assistant-message-1",
+        role: "assistant",
+        content: "The monthly rent amount is $2,000.",
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.messageCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ role: "assistant" }),
+    });
+    expect(mocks.messageCreate).not.toHaveBeenCalledWith({
+      data: expect.objectContaining({ role: "user" }),
+    });
   });
 });

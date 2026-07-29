@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { createChatbotAction } from "@/app/actions";
 import { CreateChatbotForm } from "@/components/CreateChatbotForm";
 import { requireUser } from "@/lib/auth";
 
@@ -21,7 +20,7 @@ export default async function NewChatbotPage() {
         </p>
       </div>
 
-      <CreateChatbotForm action={createChatbotAction} />
+      <CreateChatbotForm />
     </main>
   );
 }
