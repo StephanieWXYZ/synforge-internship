@@ -3,23 +3,61 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { ChatInterface } from "@/components/ChatInterface";
+import { requireUser } from "@/lib/auth";
+import { getSuggestedQuestions } from "@/lib/chatbotTemplates";
 import { db } from "@/lib/db";
-import { getSuggestedQuestions } from "@/lib/suggestedQuestions";
 
 type ChatPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ conversation?: string }>;
 };
 
-export default async function ChatPage({ params }: ChatPageProps) {
+type MessageSource = {
+  fileName: string;
+  chunkIndex: number;
+  preview?: string;
+  score?: number;
+};
+
+function parseSources(sourcesJson: string | null): MessageSource[] {
+  if (!sourcesJson) {
+    return [];
+  }
+
+  try {
+    const sources = JSON.parse(sourcesJson);
+    return Array.isArray(sources) ? sources : [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function ChatPage({ params, searchParams }: ChatPageProps) {
+  const user = await requireUser();
   const { id } = await params;
-  const chatbot = await db.chatbot.findUnique({
-    where: { id },
-    include: { _count: { select: { documents: true, chunks: true } } },
+  const { conversation: selectedConversationId } = await searchParams;
+  const chatbot = await db.chatbot.findFirst({
+    where: { id, userId: user.id },
+    include: {
+      conversations: {
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { messages: true } } },
+      },
+      _count: { select: { documents: true, chunks: true } },
+    },
   });
 
   if (!chatbot) {
     notFound();
   }
+
+  const selectedConversation = selectedConversationId
+    ? await db.conversation.findFirst({
+        where: { id: selectedConversationId, chatbotId: chatbot.id, userId: user.id },
+        include: { messages: { where: { userId: user.id }, orderBy: { createdAt: "asc" } } },
+      })
+    : null;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 py-8 sm:px-8">
@@ -42,7 +80,23 @@ export default async function ChatPage({ params }: ChatPageProps) {
         </div>
       </div>
       <ChatInterface
+        key={selectedConversation?.id ?? "new-conversation"}
         chatbotId={chatbot.id}
+        conversations={chatbot.conversations.map((conversation) => ({
+          id: conversation.id,
+          title: conversation.title,
+          createdAt: conversation.createdAt,
+          messageCount: conversation._count.messages,
+        }))}
+        initialConversationId={selectedConversation?.id ?? ""}
+        initialMessages={
+          selectedConversation?.messages.map((message) => ({
+            id: message.id,
+            role: message.role === "assistant" ? "assistant" : "user",
+            content: message.content,
+            sources: parseSources(message.sourcesJson),
+          })) ?? []
+        }
         suggestedQuestions={getSuggestedQuestions(chatbot.name, chatbot.domain)}
       />
     </main>

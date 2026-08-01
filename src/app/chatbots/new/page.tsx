@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { createChatbotAction } from "@/app/actions";
 import { CreateChatbotForm } from "@/components/CreateChatbotForm";
+import { requireUser } from "@/lib/auth";
 
-export default function NewChatbotPage() {
+export default async function NewChatbotPage() {
+  await requireUser();
+
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-8 sm:px-8">
       <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
@@ -18,7 +20,7 @@ export default function NewChatbotPage() {
         </p>
       </div>
 
-      <CreateChatbotForm action={createChatbotAction} />
+      <CreateChatbotForm />
     </main>
   );
 }
