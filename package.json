@@ -7,11 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
+    "test": "vitest run tests",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1101.0",
     "@prisma/client": "^5.22.0",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.0",

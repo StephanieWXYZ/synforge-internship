@@ -1,0 +1,25 @@
+{
+  "name": "@multi-persona/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test test/*.test.ts",
+    "config:validate": "node --import tsx bin/validate-config.ts",
+    "cdk:synth": "cdk synth --app 'node --import tsx bin/app.ts'",
+    "cdk:bootstrap": "cdk bootstrap",
+    "cdk:deploy": "MULTI_PERSONA_REQUIRE_DEPLOYMENT_READY=true cdk deploy '*-app' --require-approval never --app 'node --import tsx bin/app.ts'"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.204.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "aws-cdk": "^2.1024.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
