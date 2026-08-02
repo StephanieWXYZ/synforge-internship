@@ -1,5 +1,4 @@
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 export const SUPPORTED_FILE_TYPES = new Set([
@@ -34,6 +33,7 @@ export async function parseDocument(buffer: Buffer, fileName: string, fileType: 
   }
 
   if (fileType === "application/pdf" || extension === "pdf") {
+    const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: buffer });
     try {
       const parsed = await parser.getText();
