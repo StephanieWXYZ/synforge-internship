@@ -120,9 +120,11 @@ credentials in GitHub Actions.
 > **AWS storage:** Amplify uses the stack-managed DynamoDB table through its SSR
 > Compute Role. The table is on-demand, has point-in-time recovery and deletion
 > protection enabled, and is retained if the stack is deleted. Local development
-> continues to use SQLite when `DYNAMODB_TABLE_NAME` is absent. Uploaded source
-> files still use local `uploads/`; move them to S3 before relying on document
-> reprocessing across deployments.
+> continues to use SQLite when `DYNAMODB_TABLE_NAME` is absent. In AWS, uploaded
+> source files are stored in the stack-managed private S3 bucket through the same
+> Compute Role. The bucket blocks public access, uses S3-managed encryption and
+> versioning, and is retained if the stack is deleted. Local development continues
+> to store source files under `uploads/` when `UPLOAD_BUCKET_NAME` is absent.
 
 After deploying the stack, verify the complete AWS data path with:
 
@@ -135,7 +137,10 @@ conversation, and message, verifies the expected queries, and removes its data.
 
 ## Document Processing
 
-Uploads are validated by type and size, stored under `uploads/`, parsed into text, split into roughly 1,000 character chunks with overlap, embedded, and stored in SQLite. PDF, TXT, and DOCX are supported for the MVP.
+Uploads are validated by type and size, stored in S3 on AWS (or under `uploads/`
+locally), parsed into text, split into roughly 1,000 character chunks with overlap,
+embedded, and stored in the configured database. PDF, TXT, and DOCX are supported
+for the MVP.
 
 ## Retrieval Flow
 

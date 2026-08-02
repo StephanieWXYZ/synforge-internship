@@ -47,5 +47,6 @@ next-env.d.ts
 
 # Local AWS deployment configuration and synthesized templates
 /infra/config/deployment.json
+/cdk.out/
 /infra/cdk.out/
 /infra/node_modules/

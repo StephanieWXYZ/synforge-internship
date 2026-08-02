@@ -1,9 +1,14 @@
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { chunkText } from "@/lib/chunking";
 import { db } from "@/lib/db";
 import { DOCUMENT_ERROR_MESSAGES } from "@/lib/documentErrors";
+import {
+  createDocumentStoragePath,
+  readStoredDocument,
+  removeStoredDocument,
+  storeDocument,
+} from "@/lib/documentStorage";
 import {
   isSupportedFile,
   MAX_FILE_SIZE,
@@ -11,8 +16,6 @@ import {
 } from "@/lib/documentParser";
 import { generateEmbedding } from "@/lib/llm";
 import { findDocumentForChatbot } from "@/lib/resourceValidation";
-
-const uploadRoot = path.join(process.cwd(), "uploads");
 
 type StoredDocument = {
   id: string;
@@ -82,24 +85,27 @@ export async function saveAndProcessDocument(userId: string, chatbotId: string, 
     throw new Error(DOCUMENT_ERROR_MESSAGES.chatbotNotFound);
   }
 
-  await mkdir(uploadRoot, { recursive: true });
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const storedName = `${Date.now()}-${crypto.randomUUID()}-${safeName}`;
-  const filePath = path.join(uploadRoot, storedName);
+  const filePath = createDocumentStoragePath(userId, chatbotId, file.name);
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const document = await db.document.create({
-    data: {
-      userId,
-      chatbotId,
-      fileName: file.name,
-      fileType: file.type || path.extname(file.name).slice(1),
-      filePath,
-      status: "uploaded",
-    },
-  });
+  await storeDocument(filePath, buffer);
 
-  await writeFile(filePath, buffer);
+  let document;
+  try {
+    document = await db.document.create({
+      data: {
+        userId,
+        chatbotId,
+        fileName: file.name,
+        fileType: file.type || path.extname(file.name).slice(1),
+        filePath,
+        status: "uploaded",
+      },
+    });
+  } catch (error) {
+    await removeStoredDocument(filePath);
+    throw error;
+  }
 
   return processStoredDocument(document, buffer);
 }
@@ -115,7 +121,7 @@ export async function reprocessDocument(userId: string, chatbotId: string, docum
     throw new Error(DOCUMENT_ERROR_MESSAGES.reprocessOnlyFailed);
   }
 
-  const buffer = await readFile(document.filePath);
+  const buffer = await readStoredDocument(document.filePath);
   return processStoredDocument(document, buffer);
 }
 
@@ -126,13 +132,7 @@ export async function deleteDocument(userId: string, chatbotId: string, document
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
   }
 
-  try {
-    await unlink(document.filePath);
-  } catch (error) {
-    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
-      throw error;
-    }
-  }
+  await removeStoredDocument(document.filePath);
 
   return db.document.delete({ where: { id: document.id } });
 }

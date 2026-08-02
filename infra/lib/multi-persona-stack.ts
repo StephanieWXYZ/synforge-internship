@@ -7,6 +7,7 @@ import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpUrlIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import { DeploymentConfig, DeploymentStage, stackBaseName } from "./config.js";
@@ -44,6 +45,13 @@ export class MultiPersonaStack extends cdk.Stack {
       sortKey: { name: "relatedSk", type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
     });
+    const uploadBucket = new s3.Bucket(this, "UploadBucket", {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      versioned: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
     const runtimeSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "RuntimeSecret",
@@ -64,6 +72,12 @@ export class MultiPersonaStack extends cdk.Stack {
       "dynamodb:BatchWriteItem",
       "dynamodb:ConditionCheckItem",
     );
+    computeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+        resources: [`${uploadBucket.bucketArn}/*`],
+      }),
+    );
 
     const amplifyApp = new amplify.CfnApp(this, "AmplifyApp", {
       name: props.config.hosting.appName,
@@ -78,6 +92,7 @@ export class MultiPersonaStack extends cdk.Stack {
       environmentVariables: [
         { name: "DYNAMODB_TABLE_NAME", value: database.tableName },
         { name: "RUNTIME_SECRET_NAME", value: props.config.hosting.runtimeSecretName },
+        { name: "UPLOAD_BUCKET_NAME", value: uploadBucket.bucketName },
       ],
     });
 
@@ -132,6 +147,7 @@ export class MultiPersonaStack extends cdk.Stack {
     new cdk.CfnOutput(this, "AmplifyFrontendUrl", { value: amplifyOrigin });
     new cdk.CfnOutput(this, "ApiBaseUrl", { value: api.apiEndpoint });
     new cdk.CfnOutput(this, "DatabaseTableName", { value: database.tableName });
+    new cdk.CfnOutput(this, "UploadBucketName", { value: uploadBucket.bucketName });
   }
 }
 
