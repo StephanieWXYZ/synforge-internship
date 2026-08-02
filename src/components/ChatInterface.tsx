@@ -259,7 +259,7 @@ export function ChatInterface({
                       <button
                         key={suggestedQuestion}
                         type="button"
-                        onClick={() => sendQuestion(suggestedQuestion)}
+                        onClick={() => setQuestion(suggestedQuestion)}
                         disabled={isSending}
                         className="rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm leading-5 text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
                       >
