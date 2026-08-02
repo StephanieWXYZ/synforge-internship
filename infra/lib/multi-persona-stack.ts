@@ -61,6 +61,27 @@ export class MultiPersonaStack extends cdk.Stack {
         },
       ],
     });
+    const vectorBucketName = `${baseName}-vectors`;
+    const vectorIndexName = "chunks-v1-1536";
+    const vectorBucket = new cdk.CfnResource(this, "VectorBucket", {
+      type: "AWS::S3Vectors::VectorBucket",
+      properties: {
+        VectorBucketName: vectorBucketName,
+      },
+    });
+    vectorBucket.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
+    const vectorIndex = new cdk.CfnResource(this, "VectorIndex", {
+      type: "AWS::S3Vectors::Index",
+      properties: {
+        VectorBucketName: vectorBucketName,
+        IndexName: vectorIndexName,
+        DataType: "float32",
+        Dimension: 1536,
+        DistanceMetric: "cosine",
+      },
+    });
+    vectorIndex.addResourceDependency(vectorBucket);
+    vectorIndex.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
     const runtimeSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "RuntimeSecret",
@@ -87,6 +108,17 @@ export class MultiPersonaStack extends cdk.Stack {
         resources: [`${uploadBucket.bucketArn}/*`],
       }),
     );
+    computeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "s3vectors:PutVectors",
+          "s3vectors:QueryVectors",
+          "s3vectors:GetVectors",
+          "s3vectors:DeleteVectors",
+        ],
+        resources: [vectorIndex.ref],
+      }),
+    );
 
     const amplifyApp = new amplify.CfnApp(this, "AmplifyApp", {
       name: props.config.hosting.appName,
@@ -102,6 +134,11 @@ export class MultiPersonaStack extends cdk.Stack {
         { name: "DYNAMODB_TABLE_NAME", value: database.tableName },
         { name: "RUNTIME_SECRET_NAME", value: props.config.hosting.runtimeSecretName },
         { name: "UPLOAD_BUCKET_NAME", value: uploadBucket.bucketName },
+        { name: "VECTOR_BUCKET_NAME", value: vectorBucketName },
+        { name: "VECTOR_INDEX_NAME", value: vectorIndexName },
+        { name: "VECTOR_DIMENSION", value: "1536" },
+        { name: "VECTOR_EMBEDDING_VERSION", value: "v1" },
+        { name: "VECTOR_STORE", value: props.config.hosting.vectorStore },
       ],
     });
 
@@ -157,6 +194,8 @@ export class MultiPersonaStack extends cdk.Stack {
     new cdk.CfnOutput(this, "ApiBaseUrl", { value: api.apiEndpoint });
     new cdk.CfnOutput(this, "DatabaseTableName", { value: database.tableName });
     new cdk.CfnOutput(this, "UploadBucketName", { value: uploadBucket.bucketName });
+    new cdk.CfnOutput(this, "VectorBucketName", { value: vectorBucketName });
+    new cdk.CfnOutput(this, "VectorIndexName", { value: vectorIndexName });
   }
 }
 

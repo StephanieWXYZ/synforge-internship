@@ -39,8 +39,15 @@ describe("retrieveRelevantChunks", () => {
 
     const chunks = await retrieveRelevantChunks("user-1", "chatbot-b", "What is covered?");
 
-    expect(mocks.findMany).toHaveBeenCalledWith({
+    expect(mocks.findMany).toHaveBeenNthCalledWith(1, {
       where: { chatbotId: "chatbot-b", userId: "user-1" },
+    });
+    expect(mocks.findMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { in: ["chunk-b"] },
+        chatbotId: "chatbot-b",
+        userId: "user-1",
+      },
       include: { document: true },
     });
     expect(chunks).toEqual([

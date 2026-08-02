@@ -20,6 +20,7 @@ import {
 } from "@/lib/documentParser";
 import { generateEmbeddings } from "@/lib/llm";
 import { findDocumentForChatbot } from "@/lib/resourceValidation";
+import { getEmbeddingVersion, getVectorStore } from "@/lib/vectorStore";
 
 type StoredDocument = {
   id: string;
@@ -92,11 +93,8 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
     data: { status: "processing" },
   });
 
-  await db.documentChunk.deleteMany({
-    where: { documentId: document.id },
-  });
-
   try {
+    await deleteDocumentChunks(document);
     const text = await parseDocument(buffer, document.fileName, document.fileType);
     const chunks = chunkText(text);
 
@@ -108,7 +106,7 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
       const batch = chunks.slice(offset, offset + EMBEDDING_BATCH_SIZE);
       const embeddings = await generateEmbeddings(batch.map((chunk) => chunk.content));
 
-      await Promise.all(
+      const storedChunks = await Promise.all(
         batch.map((chunk, index) =>
           db.documentChunk.create({
             data: {
@@ -121,6 +119,19 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
             },
           }),
         ),
+      );
+      if (!document.userId) {
+        throw new Error("Document owner is required before indexing vectors.");
+      }
+      await getVectorStore().upsert(
+        storedChunks.map((storedChunk, index) => ({
+          chunkId: storedChunk.id,
+          userId: document.userId as string,
+          chatbotId: document.chatbotId,
+          documentId: document.id,
+          embedding: embeddings[index],
+          embeddingVersion: getEmbeddingVersion(),
+        })),
       );
     }
 
@@ -135,6 +146,18 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
     });
     throw error;
   }
+}
+
+async function deleteDocumentChunks(document: StoredDocument) {
+  const chunks = await db.documentChunk.findMany({
+    where: {
+      documentId: document.id,
+      chatbotId: document.chatbotId,
+      userId: document.userId,
+    },
+  });
+  await getVectorStore().delete(chunks.map((chunk) => chunk.id));
+  await db.documentChunk.deleteMany({ where: { documentId: document.id } });
 }
 
 export async function saveAndProcessDocument(userId: string, chatbotId: string, file: File) {
@@ -228,6 +251,7 @@ export async function deleteDocument(userId: string, chatbotId: string, document
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
   }
 
+  await deleteDocumentChunks(document);
   await removeStoredDocument(document.filePath);
 
   return db.document.delete({ where: { id: document.id } });

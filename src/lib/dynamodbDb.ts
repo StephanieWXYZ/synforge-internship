@@ -373,10 +373,20 @@ export function createDynamoDb(tableName: string) {
         return { count: items.length };
       },
       async findMany({ where, include }: { where: Where; include?: Include }) {
-        const items = await queryOwner(entityKey("chatbot", asString(where.chatbotId)), "CHUNK#");
-        const ownedItems = where.userId
-          ? items.filter((item) => item.userId === where.userId)
-          : items;
+        const idFilter = where.id as { in?: unknown[] } | undefined;
+        const items = idFilter?.in
+          ? (await Promise.all(idFilter.in.map((id) => get("chunk", asString(id))))).filter(
+              (item): item is Item => Boolean(item),
+            )
+          : where.documentId
+            ? await queryRelated(entityKey("document", asString(where.documentId)), "CHUNK#")
+            : await queryOwner(entityKey("chatbot", asString(where.chatbotId)), "CHUNK#");
+        const ownedItems = items.filter((item) => {
+          if (where.userId && item.userId !== where.userId) return false;
+          if (where.chatbotId && item.chatbotId !== where.chatbotId) return false;
+          if (where.documentId && item.documentId !== where.documentId) return false;
+          return true;
+        });
         return Promise.all(
           ownedItems.map(async (item) => {
             const chunk = publicItem(item) as Record<string, unknown>;

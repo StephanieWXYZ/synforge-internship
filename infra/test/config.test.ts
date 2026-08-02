@@ -13,6 +13,7 @@ test("loads the checked-in example configuration for synthesis", () => {
   const config = loadConfig(fixture);
   assert.equal(config.projectName, "multi-persona");
   assert.equal(config.github.repo, "multi-persona");
+  assert.equal(config.hosting.vectorStore, "database");
 });
 
 test("rejects placeholder account ids and secret names for deployment", () => {

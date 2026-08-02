@@ -17,6 +17,7 @@ export interface DeploymentConfig {
     appName: string;
     amplifyGithubTokenSecretName: string;
     runtimeSecretName: string;
+    vectorStore: "database" | "s3-vectors";
   };
 }
 
@@ -63,6 +64,8 @@ export function loadConfig(configPath = resolveConfigPath()): DeploymentConfig {
       amplifyGithubTokenSecretName:
         parsed.hosting?.amplifyGithubTokenSecretName?.trim() ?? "",
       runtimeSecretName: parsed.hosting?.runtimeSecretName?.trim() ?? "",
+      vectorStore:
+        parsed.hosting?.vectorStore === "s3-vectors" ? "s3-vectors" : "database",
     },
   };
 }

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   documentUpdate: vi.fn(),
   documentChunkDeleteMany: vi.fn(),
   documentChunkCreate: vi.fn(),
+  documentChunkFindMany: vi.fn(),
 }));
 
 vi.mock("@/lib/resourceValidation", () => ({
@@ -41,6 +42,7 @@ vi.mock("@/lib/db", () => ({
     documentChunk: {
       deleteMany: mocks.documentChunkDeleteMany,
       create: mocks.documentChunkCreate,
+      findMany: mocks.documentChunkFindMany,
     },
   },
 }));
@@ -76,6 +78,7 @@ describe("document processing", () => {
       inputs.map((_, index) => [index, 1]),
     );
     mocks.documentChunkCreate.mockResolvedValue({});
+    mocks.documentChunkFindMany.mockResolvedValue([]);
     mocks.documentChunkDeleteMany.mockResolvedValue({ count: 0 });
     mocks.documentUpdate.mockImplementation(async ({ data }: { data: { status: string } }) => ({
       ...document,
