@@ -6,6 +6,7 @@ import * as amplify from "aws-cdk-lib/aws-amplify";
 import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpUrlIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as cloudwatchActions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -13,6 +14,8 @@ import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as snsSubscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import { DeploymentConfig, DeploymentStage, stackBaseName } from "./config.js";
@@ -249,6 +252,19 @@ export class MultiPersonaStack extends cdk.Stack {
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
+    let documentAlarmTopic: sns.Topic | undefined;
+    const alertEmail = props.config.monitoring?.alertEmail;
+    if (alertEmail) {
+      documentAlarmTopic = new sns.Topic(this, "DocumentAlarmTopic", {
+        topicName: `${baseName}-document-alarms`,
+        displayName: "Multi Persona document processing alarms",
+      });
+      documentAlarmTopic.addSubscription(new snsSubscriptions.EmailSubscription(alertEmail));
+      const alarmAction = new cloudwatchActions.SnsAction(documentAlarmTopic);
+      documentDeadLetterAlarm.addAlarmAction(alarmAction);
+      documentQueueAgeAlarm.addAlarmAction(alarmAction);
+      documentWorkerErrorAlarm.addAlarmAction(alarmAction);
+    }
 
     const api = new apigwv2.HttpApi(this, "HttpApi", {
       apiName: `${baseName}-http-api`,
@@ -309,6 +325,11 @@ export class MultiPersonaStack extends cdk.Stack {
     new cdk.CfnOutput(this, "DocumentWorkerErrorAlarmName", {
       value: documentWorkerErrorAlarm.alarmName,
     });
+    if (documentAlarmTopic) {
+      new cdk.CfnOutput(this, "DocumentAlarmTopicArn", {
+        value: documentAlarmTopic.topicArn,
+      });
+    }
   }
 }
 

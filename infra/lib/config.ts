@@ -19,6 +19,9 @@ export interface DeploymentConfig {
     runtimeSecretName: string;
     vectorStore: "database" | "s3-vectors";
   };
+  monitoring?: {
+    alertEmail?: string;
+  };
 }
 
 const configDirectory = path.resolve(import.meta.dirname, "../config");
@@ -67,6 +70,9 @@ export function loadConfig(configPath = resolveConfigPath()): DeploymentConfig {
       vectorStore:
         parsed.hosting?.vectorStore === "s3-vectors" ? "s3-vectors" : "database",
     },
+    monitoring: {
+      alertEmail: parsed.monitoring?.alertEmail?.trim() ?? "",
+    },
   };
 }
 
@@ -111,6 +117,10 @@ export function validateDeploymentReady(config: DeploymentConfig): void {
   }
   if (!/^(?!.*\.\.)(?!.*[~^:?*\[\\])[A-Za-z0-9._/-]+$/.test(config.github.branch)) {
     throw new Error("github.branch must be one exact branch without wildcards.");
+  }
+  const alertEmail = config.monitoring?.alertEmail;
+  if (alertEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alertEmail)) {
+    throw new Error("monitoring.alertEmail must be a valid email address.");
   }
 }
 

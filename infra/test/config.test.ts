@@ -14,6 +14,7 @@ test("loads the checked-in example configuration for synthesis", () => {
   assert.equal(config.projectName, "multi-persona");
   assert.equal(config.github.repo, "multi-persona");
   assert.equal(config.hosting.vectorStore, "database");
+  assert.equal(config.monitoring?.alertEmail, "alerts@example.com");
 });
 
 test("rejects placeholder account ids and secret names for deployment", () => {
