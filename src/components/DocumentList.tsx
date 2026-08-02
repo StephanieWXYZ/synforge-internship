@@ -14,12 +14,14 @@ type DocumentListProps = {
     fileType: string;
     status: string;
     createdAt: Date;
+    updatedAt: Date;
     _count?: { chunks: number };
   }>;
 };
 
 const statusClass: Record<string, string> = {
   uploaded: "bg-slate-100 text-slate-700",
+  queued: "bg-blue-100 text-blue-800",
   processing: "bg-amber-100 text-amber-800",
   ready: "bg-emerald-100 text-emerald-800",
   failed: "bg-rose-100 text-rose-800",
@@ -27,6 +29,7 @@ const statusClass: Record<string, string> = {
 
 const statusLabel: Record<string, string> = {
   uploaded: "Processing document...",
+  queued: "Queued for processing...",
   processing: "Processing document...",
   ready: "Ready",
   failed: "Processing failed",
@@ -42,8 +45,8 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
   } | null>(null);
   const hasActiveProcessingDocument = documents.some(
     (document) =>
-      ["uploaded", "processing"].includes(document.status) &&
-      !canReprocessDocument(document.status, document.createdAt),
+      ["uploaded", "queued", "processing"].includes(document.status) &&
+      !canReprocessDocument(document.status, document.updatedAt ?? document.createdAt),
   );
 
   useEffect(() => {
@@ -161,9 +164,12 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
       ) : null}
 
       {filteredDocuments.map((document) => {
-        const canReprocess = canReprocessDocument(document.status, document.createdAt);
+        const canReprocess = canReprocessDocument(
+          document.status,
+          document.updatedAt ?? document.createdAt,
+        );
         const displayStatus =
-          canReprocess && ["uploaded", "processing"].includes(document.status)
+          canReprocess && ["uploaded", "queued", "processing"].includes(document.status)
             ? "Processing stalled"
             : (statusLabel[document.status] ?? document.status);
 

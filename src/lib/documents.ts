@@ -3,10 +3,15 @@ import path from "node:path";
 import { chunkText } from "@/lib/chunking";
 import { db } from "@/lib/db";
 import { DOCUMENT_ERROR_MESSAGES } from "@/lib/documentErrors";
+import {
+  enqueueDocumentProcessing,
+  usesDocumentQueue,
+} from "@/lib/documentQueue";
 import { canReprocessDocument } from "@/lib/documentStatus";
 import {
   createDocumentStoragePath,
   createDocumentUploadUrl,
+  getStoredDocumentSize,
   readStoredDocument,
   removeStoredDocument,
   storeDocument,
@@ -29,6 +34,9 @@ type StoredDocument = {
   fileName: string;
   fileType: string;
   filePath: string;
+  status?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 };
 
 const EMBEDDING_BATCH_SIZE = 32;
@@ -67,24 +75,62 @@ async function createAndProcessDocument(
   filePath: string,
   buffer: Buffer,
 ) {
-  let document;
+  const document = await createDocumentRecord(
+    userId,
+    chatbotId,
+    metadata,
+    filePath,
+    "uploaded",
+  );
+
+  return processStoredDocument(document, buffer);
+}
+
+async function createDocumentRecord(
+  userId: string,
+  chatbotId: string,
+  metadata: DocumentUploadMetadata,
+  filePath: string,
+  status: "uploaded" | "queued",
+) {
   try {
-    document = await db.document.create({
+    return await db.document.create({
       data: {
         userId,
         chatbotId,
         fileName: metadata.fileName,
         fileType: metadata.fileType || path.extname(metadata.fileName).slice(1),
         filePath,
-        status: "uploaded",
+        status,
       },
     });
   } catch (error) {
     await removeStoredDocument(filePath);
     throw error;
   }
+}
 
-  return processStoredDocument(document, buffer);
+async function createAndQueueDocument(
+  userId: string,
+  chatbotId: string,
+  metadata: DocumentUploadMetadata,
+  filePath: string,
+) {
+  const document = await createDocumentRecord(
+    userId,
+    chatbotId,
+    metadata,
+    filePath,
+    "queued",
+  );
+  try {
+    await enqueueDocumentProcessing({ documentId: document.id, userId, chatbotId });
+    return document;
+  } catch (error) {
+    await db.document.delete({ where: { id: document.id } });
+    await removeStoredDocument(filePath);
+    throw error;
+  }
 }
 
 async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
@@ -220,12 +266,17 @@ export async function processDirectDocumentUpload(
     throw new Error(DOCUMENT_ERROR_MESSAGES.uploadFailed);
   }
 
-  const buffer = await readStoredDocument(filePath);
-  if (buffer.length !== metadata.fileSize || buffer.length > MAX_FILE_SIZE) {
+  const storedSize = await getStoredDocumentSize(filePath);
+  if (storedSize !== metadata.fileSize || storedSize > MAX_FILE_SIZE) {
     await removeStoredDocument(filePath);
     throw new Error(DOCUMENT_ERROR_MESSAGES.fileSizeMismatch);
   }
 
+  if (usesDocumentQueue()) {
+    return createAndQueueDocument(userId, chatbotId, metadata, filePath);
+  }
+
+  const buffer = await readStoredDocument(filePath);
   return createAndProcessDocument(userId, chatbotId, metadata, filePath, buffer);
 }
 
@@ -236,8 +287,50 @@ export async function reprocessDocument(userId: string, chatbotId: string, docum
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
   }
 
-  if (!canReprocessDocument(document.status, document.createdAt)) {
+  if (!canReprocessDocument(document.status, document.updatedAt ?? document.createdAt)) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.reprocessOnlyFailed);
+  }
+
+  if (usesDocumentQueue()) {
+    const queuedDocument = await db.document.update({
+      where: { id: document.id },
+      data: { status: "queued" },
+    });
+    try {
+      await enqueueDocumentProcessing({ documentId: document.id, userId, chatbotId });
+      return queuedDocument;
+    } catch (error) {
+      await db.document.update({ where: { id: document.id }, data: { status: "failed" } });
+      throw error;
+    }
+  }
+
+  const buffer = await readStoredDocument(document.filePath);
+  return processStoredDocument(document, buffer);
+}
+
+export async function processQueuedDocument(
+  userId: string,
+  chatbotId: string,
+  documentId: string,
+) {
+  const document = await findDocumentForChatbot(userId, chatbotId, documentId);
+  if (!document) {
+    return null;
+  }
+  if (document.status === "ready") {
+    return document;
+  }
+  if (
+    document.status === "processing" &&
+    !canReprocessDocument(document.status, document.updatedAt ?? document.createdAt)
+  ) {
+    return document;
+  }
+  if (
+    !["queued", "uploaded", "failed", "processing"].includes(document.status)
+  ) {
+    throw new Error(`Document cannot be processed from status ${document.status}.`);
   }
 
   const buffer = await readStoredDocument(document.filePath);

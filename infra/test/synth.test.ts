@@ -24,7 +24,10 @@ test("synthesizes Amplify SSR and an API Gateway proxy", () => {
   template.resourceCountIs("AWS::Amplify::App", 1);
   template.resourceCountIs("AWS::Amplify::Branch", 1);
   template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
-  template.resourceCountIs("AWS::IAM::Role", 1);
+  template.resourceCountIs("AWS::IAM::Role", 2);
+  template.resourceCountIs("AWS::SQS::Queue", 2);
+  template.resourceCountIs("AWS::Lambda::Function", 1);
+  template.resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
   template.hasResourceProperties("AWS::Amplify::App", { Platform: "WEB_COMPUTE" });
   template.hasResourceProperties("AWS::Amplify::Branch", {
     EnableAutoBuild: true,
@@ -48,6 +51,12 @@ test("synthesizes Amplify SSR and an API Gateway proxy", () => {
   assert.match(json, /s3vectors:QueryVectors/);
   assert.match(json, /s3vectors:PutVectors/);
   assert.match(json, /s3:PutObject/);
+  assert.match(json, /DOCUMENT_QUEUE_URL/);
+  assert.match(json, /WORKER_SECRET_NAME/);
+  assert.match(json, /sqs:SendMessage/);
+  assert.match(json, /ReportBatchItemFailures/);
+  assert.match(json, /document-dlq\.fifo/);
+  assert.match(json, /DOCUMENT_QUEUE_URL/);
   assert.match(json, /CorsConfiguration/);
   assert.match(json, /secretsmanager:GetSecretValue/);
   assert.match(json, /\/api\/\{proxy\+\}/);

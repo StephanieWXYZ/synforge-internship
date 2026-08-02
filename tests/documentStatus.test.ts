@@ -14,12 +14,16 @@ describe("document processing status", () => {
         now,
       ),
     ).toBe(true);
+    expect(
+      canReprocessDocument("queued", new Date(now - STALE_PROCESSING_AFTER_MS - 1), now),
+    ).toBe(true);
   });
 
   it("does not allow active or ready documents to be reprocessed", () => {
     const now = Date.now();
 
     expect(canReprocessDocument("processing", new Date(now), now)).toBe(false);
+    expect(canReprocessDocument("queued", new Date(now), now)).toBe(false);
     expect(canReprocessDocument("ready", new Date(now - STALE_PROCESSING_AFTER_MS), now)).toBe(
       false,
     );

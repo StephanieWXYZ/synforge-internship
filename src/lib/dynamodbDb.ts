@@ -309,6 +309,7 @@ export function createDynamoDb(tableName: string) {
           filePath: asString(data.filePath),
           status: asString(data.status) || "uploaded",
           createdAt,
+          updatedAt: createdAt,
           ownerPk: entityKey("chatbot", asString(data.chatbotId)),
           ownerSk: `DOCUMENT#${createdAt}#${id}`,
           relatedPk: entityKey("user", asString(data.userId)),
@@ -327,7 +328,7 @@ export function createDynamoDb(tableName: string) {
       async update({ where, data }: { where: Where; data: Data }) {
         const item = await get("document", asString(where.id));
         if (!item) throw new Error("Document not found.");
-        const updated = { ...item, ...data };
+        const updated = { ...item, ...data, updatedAt: now() };
         await put(updated);
         return publicItem(updated);
       },

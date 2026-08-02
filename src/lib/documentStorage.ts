@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -83,6 +84,16 @@ export async function readStoredDocument(filePath: string) {
   }
 
   return readFile(filePath);
+}
+
+export async function getStoredDocumentSize(filePath: string) {
+  if (uploadBucketName) {
+    const response = await getS3Client().send(
+      new HeadObjectCommand({ Bucket: uploadBucketName, Key: filePath }),
+    );
+    return response.ContentLength ?? 0;
+  }
+  return (await readFile(filePath)).length;
 }
 
 export async function removeStoredDocument(filePath: string) {

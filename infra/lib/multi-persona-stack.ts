@@ -7,8 +7,12 @@ import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpUrlIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import { DeploymentConfig, DeploymentStage, stackBaseName } from "./config.js";
 
@@ -87,12 +91,39 @@ export class MultiPersonaStack extends cdk.Stack {
       "RuntimeSecret",
       props.config.hosting.runtimeSecretName,
     );
+    const workerSecret = new secretsmanager.Secret(this, "WorkerSecret", {
+      secretName: `${baseName}-document-worker`,
+      description: "HMAC key used only between the SQS dispatcher and document worker route.",
+      generateSecretString: {
+        passwordLength: 48,
+        excludePunctuation: true,
+      },
+    });
+    const documentDeadLetterQueue = new sqs.Queue(this, "DocumentDeadLetterQueue", {
+      queueName: `${baseName}-document-dlq.fifo`,
+      fifo: true,
+      retentionPeriod: cdk.Duration.days(14),
+      encryption: sqs.QueueEncryption.SQS_MANAGED,
+    });
+    const documentQueue = new sqs.Queue(this, "DocumentQueue", {
+      queueName: `${baseName}-document.fifo`,
+      fifo: true,
+      retentionPeriod: cdk.Duration.days(4),
+      visibilityTimeout: cdk.Duration.minutes(84),
+      encryption: sqs.QueueEncryption.SQS_MANAGED,
+      deadLetterQueue: {
+        queue: documentDeadLetterQueue,
+        maxReceiveCount: 5,
+      },
+    });
     const computeRole = new iam.Role(this, "AmplifyComputeRole", {
       roleName: `${baseName}-amplify-compute-role`,
       description: "Least-privilege role used by the Amplify Next.js SSR runtime.",
       assumedBy: new iam.ServicePrincipal("amplify.amazonaws.com"),
     });
     runtimeSecret.grantRead(computeRole);
+    workerSecret.grantRead(computeRole);
+    documentQueue.grantSendMessages(computeRole);
     database.grant(
       computeRole,
       "dynamodb:GetItem",
@@ -139,6 +170,8 @@ export class MultiPersonaStack extends cdk.Stack {
         { name: "VECTOR_DIMENSION", value: "1536" },
         { name: "VECTOR_EMBEDDING_VERSION", value: "v1" },
         { name: "VECTOR_STORE", value: props.config.hosting.vectorStore },
+        { name: "DOCUMENT_QUEUE_URL", value: documentQueue.queueUrl },
+        { name: "WORKER_SECRET_NAME", value: workerSecret.secretName },
       ],
     });
 
@@ -150,6 +183,34 @@ export class MultiPersonaStack extends cdk.Stack {
       stage: amplifyStage(props.config.stageName),
     });
     const amplifyOrigin = `https://${amplifyBranch.branchName}.${amplifyApp.attrDefaultDomain}`;
+
+    const documentWorker = new lambdaNodejs.NodejsFunction(this, "DocumentWorker", {
+      functionName: `${baseName}-document-worker`,
+      description: "Dispatches queued document jobs to the protected Amplify processing route.",
+      entry: path.join(projectRoot, "workers/documentProcessor.ts"),
+      handler: "handler",
+      projectRoot,
+      depsLockFilePath: path.join(projectRoot, "package-lock.json"),
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.X86_64,
+      memorySize: 256,
+      timeout: cdk.Duration.minutes(14),
+      bundling: {
+        minify: true,
+        sourceMap: true,
+      },
+      environment: {
+        AMPLIFY_ORIGIN: amplifyOrigin,
+        WORKER_SECRET_NAME: workerSecret.secretName,
+      },
+    });
+    workerSecret.grantRead(documentWorker);
+    documentWorker.addEventSource(
+      new lambdaEventSources.SqsEventSource(documentQueue, {
+        batchSize: 1,
+        reportBatchItemFailures: true,
+      }),
+    );
 
     const api = new apigwv2.HttpApi(this, "HttpApi", {
       apiName: `${baseName}-http-api`,
@@ -196,6 +257,11 @@ export class MultiPersonaStack extends cdk.Stack {
     new cdk.CfnOutput(this, "UploadBucketName", { value: uploadBucket.bucketName });
     new cdk.CfnOutput(this, "VectorBucketName", { value: vectorBucketName });
     new cdk.CfnOutput(this, "VectorIndexName", { value: vectorIndexName });
+    new cdk.CfnOutput(this, "DocumentQueueUrl", { value: documentQueue.queueUrl });
+    new cdk.CfnOutput(this, "DocumentDeadLetterQueueUrl", {
+      value: documentDeadLetterQueue.queueUrl,
+    });
+    new cdk.CfnOutput(this, "DocumentWorkerName", { value: documentWorker.functionName });
   }
 }
 
