@@ -32,7 +32,10 @@ test("synthesizes Amplify SSR and an API Gateway proxy", () => {
   });
 
   const json = JSON.stringify(template.toJSON());
-  assert.match(json, /DATABASE_URL/);
+  assert.match(json, /AWS::DynamoDB::Table/);
+  assert.match(json, /DYNAMODB_TABLE_NAME/);
+  assert.match(json, /owner-index/);
+  assert.match(json, /related-index/);
   assert.match(json, /RUNTIME_SECRET_NAME/);
   assert.match(json, /secretsmanager:GetSecretValue/);
   assert.match(json, /\/api\/\{proxy\+\}/);
