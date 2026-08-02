@@ -4,7 +4,7 @@ frontend:
     preBuild:
       commands:
         - npm ci
-        - env | grep -e DATABASE_URL -e RUNTIME_SECRET_NAME >> .env.production
+        - env | grep -e DYNAMODB_TABLE_NAME -e RUNTIME_SECRET_NAME >> .env.production
         - npm run prisma:generate
     build:
       commands:

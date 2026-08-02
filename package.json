@@ -8,11 +8,14 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run tests",
+    "smoke:dynamodb": "node --import tsx scripts/smoke-dynamodb.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1101.0",
     "@aws-sdk/client-secrets-manager": "^3.1101.0",
+    "@aws-sdk/lib-dynamodb": "^3.1101.0",
     "@prisma/client": "^5.22.0",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.0",

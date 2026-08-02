@@ -117,12 +117,21 @@ CDK outputs the Amplify URL, API Gateway base URL, and Amplify app ID. Subsequen
 commits to `main` trigger the Amplify branch build automatically without AWS
 credentials in GitHub Actions.
 
-> **Production storage prerequisite:** the current application still uses
-> SQLite and local `uploads/`. Amplify compute storage is not durable, so this
-> configuration is suitable for validating CI and hosting only. Before serving
-> real data, migrate `DATABASE_URL` to a durable database supported by the app
-> and move uploaded files to object storage such as S3. Do not treat a local
-> SQLite file in Amplify as production persistence.
+> **AWS storage:** Amplify uses the stack-managed DynamoDB table through its SSR
+> Compute Role. The table is on-demand, has point-in-time recovery and deletion
+> protection enabled, and is retained if the stack is deleted. Local development
+> continues to use SQLite when `DYNAMODB_TABLE_NAME` is absent. Uploaded source
+> files still use local `uploads/`; move them to S3 before relying on document
+> reprocessing across deployments.
+
+After deploying the stack, verify the complete AWS data path with:
+
+```bash
+DYNAMODB_TABLE_NAME=multi-persona-dev-data AWS_REGION=us-east-1 npm run smoke:dynamodb
+```
+
+The smoke test creates an isolated account, session, chatbot, document chunk,
+conversation, and message, verifies the expected queries, and removes its data.
 
 ## Document Processing
 
