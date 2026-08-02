@@ -5,12 +5,15 @@ import { db } from "@/lib/db";
 import { DOCUMENT_ERROR_MESSAGES } from "@/lib/documentErrors";
 import {
   createDocumentStoragePath,
+  createDocumentUploadUrl,
   readStoredDocument,
   removeStoredDocument,
   storeDocument,
+  usesRemoteDocumentStorage,
 } from "@/lib/documentStorage";
 import {
   isSupportedFile,
+  isSupportedFileMetadata,
   MAX_FILE_SIZE,
   parseDocument,
 } from "@/lib/documentParser";
@@ -25,6 +28,60 @@ type StoredDocument = {
   fileType: string;
   filePath: string;
 };
+
+export type DocumentUploadMetadata = {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+};
+
+function validateUploadMetadata(metadata: DocumentUploadMetadata) {
+  if (!metadata.fileName || !Number.isFinite(metadata.fileSize) || metadata.fileSize < 0) {
+    throw new Error(DOCUMENT_ERROR_MESSAGES.missingUploadFields);
+  }
+
+  if (!isSupportedFileMetadata({ name: metadata.fileName, type: metadata.fileType })) {
+    throw new Error(DOCUMENT_ERROR_MESSAGES.unsupportedFileType);
+  }
+
+  if (metadata.fileSize > MAX_FILE_SIZE) {
+    throw new Error(DOCUMENT_ERROR_MESSAGES.fileTooLarge);
+  }
+}
+
+async function requireOwnedChatbot(userId: string, chatbotId: string) {
+  const chatbot = await db.chatbot.findFirst({ where: { id: chatbotId, userId } });
+  if (!chatbot) {
+    throw new Error(DOCUMENT_ERROR_MESSAGES.chatbotNotFound);
+  }
+}
+
+async function createAndProcessDocument(
+  userId: string,
+  chatbotId: string,
+  metadata: DocumentUploadMetadata,
+  filePath: string,
+  buffer: Buffer,
+) {
+  let document;
+  try {
+    document = await db.document.create({
+      data: {
+        userId,
+        chatbotId,
+        fileName: metadata.fileName,
+        fileType: metadata.fileType || path.extname(metadata.fileName).slice(1),
+        filePath,
+        status: "uploaded",
+      },
+    });
+  } catch (error) {
+    await removeStoredDocument(filePath);
+    throw error;
+  }
+
+  return processStoredDocument(document, buffer);
+}
 
 async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
   await db.document.update({
@@ -80,34 +137,64 @@ export async function saveAndProcessDocument(userId: string, chatbotId: string, 
     throw new Error(DOCUMENT_ERROR_MESSAGES.fileTooLarge);
   }
 
-  const chatbot = await db.chatbot.findFirst({ where: { id: chatbotId, userId } });
-  if (!chatbot) {
-    throw new Error(DOCUMENT_ERROR_MESSAGES.chatbotNotFound);
-  }
+  await requireOwnedChatbot(userId, chatbotId);
 
   const filePath = createDocumentStoragePath(userId, chatbotId, file.name);
   const buffer = Buffer.from(await file.arrayBuffer());
 
   await storeDocument(filePath, buffer);
 
-  let document;
-  try {
-    document = await db.document.create({
-      data: {
-        userId,
-        chatbotId,
-        fileName: file.name,
-        fileType: file.type || path.extname(file.name).slice(1),
-        filePath,
-        status: "uploaded",
-      },
-    });
-  } catch (error) {
-    await removeStoredDocument(filePath);
-    throw error;
+  return createAndProcessDocument(
+    userId,
+    chatbotId,
+    { fileName: file.name, fileType: file.type, fileSize: file.size },
+    filePath,
+    buffer,
+  );
+}
+
+export async function prepareDirectDocumentUpload(
+  userId: string,
+  chatbotId: string,
+  metadata: DocumentUploadMetadata,
+) {
+  validateUploadMetadata(metadata);
+  await requireOwnedChatbot(userId, chatbotId);
+
+  if (!usesRemoteDocumentStorage()) {
+    return { directUpload: false as const };
   }
 
-  return processStoredDocument(document, buffer);
+  const filePath = createDocumentStoragePath(userId, chatbotId, metadata.fileName);
+  const uploadUrl = await createDocumentUploadUrl(filePath, metadata.fileType);
+  return { directUpload: true as const, filePath, uploadUrl };
+}
+
+export async function processDirectDocumentUpload(
+  userId: string,
+  chatbotId: string,
+  metadata: DocumentUploadMetadata,
+  filePath: string,
+) {
+  validateUploadMetadata(metadata);
+  await requireOwnedChatbot(userId, chatbotId);
+
+  if (!usesRemoteDocumentStorage()) {
+    throw new Error("Direct document uploads require S3 storage.");
+  }
+
+  const expectedPrefix = `users/${userId}/chatbots/${chatbotId}/documents/`;
+  if (!filePath.startsWith(expectedPrefix) || filePath.length <= expectedPrefix.length) {
+    throw new Error(DOCUMENT_ERROR_MESSAGES.uploadFailed);
+  }
+
+  const buffer = await readStoredDocument(filePath);
+  if (buffer.length !== metadata.fileSize || buffer.length > MAX_FILE_SIZE) {
+    await removeStoredDocument(filePath);
+    throw new Error(DOCUMENT_ERROR_MESSAGES.fileSizeMismatch);
+  }
+
+  return createAndProcessDocument(userId, chatbotId, metadata, filePath, buffer);
 }
 
 export async function reprocessDocument(userId: string, chatbotId: string, documentId: string) {

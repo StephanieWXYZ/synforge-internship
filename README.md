@@ -125,6 +125,8 @@ credentials in GitHub Actions.
 > Compute Role. The bucket blocks public access, uses S3-managed encryption and
 > versioning, and is retained if the stack is deleted. Local development continues
 > to store source files under `uploads/` when `UPLOAD_BUCKET_NAME` is absent.
+> Browser uploads use a five-minute presigned PUT URL so document bytes go
+> directly to S3 instead of passing through the Amplify SSR request body.
 
 After deploying the stack, verify the complete AWS data path with:
 

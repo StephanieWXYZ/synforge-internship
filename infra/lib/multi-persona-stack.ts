@@ -51,6 +51,15 @@ export class MultiPersonaStack extends cdk.Stack {
       enforceSSL: true,
       versioned: true,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      cors: [
+        {
+          allowedHeaders: ["*"],
+          allowedMethods: [s3.HttpMethods.PUT],
+          allowedOrigins: ["*"],
+          exposedHeaders: ["ETag"],
+          maxAge: 300,
+        },
+      ],
     });
     const runtimeSecret = secretsmanager.Secret.fromSecretNameV2(
       this,

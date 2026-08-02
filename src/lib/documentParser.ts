@@ -12,7 +12,7 @@ export function getFileExtension(fileName: string) {
   return fileName.split(".").pop()?.toLowerCase() ?? "";
 }
 
-export function isSupportedFile(file: File) {
+export function isSupportedFileMetadata(file: { name: string; type: string }) {
   const extension = getFileExtension(file.name);
   return (
     SUPPORTED_FILE_TYPES.has(file.type) ||
@@ -20,6 +20,10 @@ export function isSupportedFile(file: File) {
     extension === "txt" ||
     extension === "docx"
   );
+}
+
+export function isSupportedFile(file: File) {
+  return isSupportedFileMetadata(file);
 }
 
 export async function parseDocument(buffer: Buffer, fileName: string, fileType: string) {

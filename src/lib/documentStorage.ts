@@ -4,6 +4,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -15,6 +16,10 @@ let s3Client: S3Client | undefined;
 function getS3Client() {
   s3Client ??= new S3Client({});
   return s3Client;
+}
+
+export function usesRemoteDocumentStorage() {
+  return Boolean(uploadBucketName);
 }
 
 export function createDocumentStoragePath(
@@ -46,6 +51,22 @@ export async function storeDocument(filePath: string, buffer: Buffer) {
 
   await mkdir(uploadRoot, { recursive: true });
   await writeFile(filePath, buffer);
+}
+
+export async function createDocumentUploadUrl(filePath: string, contentType: string) {
+  if (!uploadBucketName) {
+    throw new Error("Direct document uploads require S3 storage.");
+  }
+
+  return getSignedUrl(
+    getS3Client(),
+    new PutObjectCommand({
+      Bucket: uploadBucketName,
+      Key: filePath,
+      ContentType: contentType,
+    }),
+    { expiresIn: 5 * 60 },
+  );
 }
 
 export async function readStoredDocument(filePath: string) {
