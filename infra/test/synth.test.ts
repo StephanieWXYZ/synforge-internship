@@ -37,6 +37,8 @@ test("synthesizes Amplify SSR and an API Gateway proxy", () => {
   assert.match(json, /owner-index/);
   assert.match(json, /related-index/);
   assert.match(json, /RUNTIME_SECRET_NAME/);
+  assert.match(json, /npm run build/);
+  assert.match(json, /npm run verify:deployment/);
   assert.match(json, /AWS::S3::Bucket/);
   assert.match(json, /UPLOAD_BUCKET_NAME/);
   assert.match(json, /s3:PutObject/);

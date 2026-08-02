@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run tests",
     "smoke:dynamodb": "node --import tsx scripts/smoke-dynamodb.ts",
+    "verify:deployment": "node --import tsx scripts/verify-deployment-artifacts.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },

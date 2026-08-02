@@ -9,6 +9,7 @@ frontend:
     build:
       commands:
         - npm run build
+        - npm run verify:deployment
   artifacts:
     baseDirectory: .next
     files:

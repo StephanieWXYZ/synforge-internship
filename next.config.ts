@@ -6,10 +6,12 @@ const nextConfig: NextConfig = {
     "/api/documents": [
       "./node_modules/@napi-rs/canvas/**/*",
       "./node_modules/@napi-rs/canvas-*/**/*",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
     ],
     "/api/documents/**": [
       "./node_modules/@napi-rs/canvas/**/*",
       "./node_modules/@napi-rs/canvas-*/**/*",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
     ],
   },
 };
