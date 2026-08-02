@@ -3,6 +3,7 @@ import path from "node:path";
 import { chunkText } from "@/lib/chunking";
 import { db } from "@/lib/db";
 import { DOCUMENT_ERROR_MESSAGES } from "@/lib/documentErrors";
+import { canReprocessDocument } from "@/lib/documentStatus";
 import {
   createDocumentStoragePath,
   createDocumentUploadUrl,
@@ -17,7 +18,7 @@ import {
   MAX_FILE_SIZE,
   parseDocument,
 } from "@/lib/documentParser";
-import { generateEmbedding } from "@/lib/llm";
+import { generateEmbeddings } from "@/lib/llm";
 import { findDocumentForChatbot } from "@/lib/resourceValidation";
 
 type StoredDocument = {
@@ -28,6 +29,8 @@ type StoredDocument = {
   fileType: string;
   filePath: string;
 };
+
+const EMBEDDING_BATCH_SIZE = 32;
 
 export type DocumentUploadMetadata = {
   fileName: string;
@@ -101,18 +104,24 @@ async function processStoredDocument(document: StoredDocument, buffer: Buffer) {
       throw new Error(DOCUMENT_ERROR_MESSAGES.noReadableText);
     }
 
-    for (const chunk of chunks) {
-      const embedding = await generateEmbedding(chunk.content);
-      await db.documentChunk.create({
-        data: {
-          documentId: document.id,
-          userId: document.userId,
-          chatbotId: document.chatbotId,
-          chunkIndex: chunk.chunkIndex,
-          content: chunk.content,
-          embedding: JSON.stringify(embedding),
-        },
-      });
+    for (let offset = 0; offset < chunks.length; offset += EMBEDDING_BATCH_SIZE) {
+      const batch = chunks.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+      const embeddings = await generateEmbeddings(batch.map((chunk) => chunk.content));
+
+      await Promise.all(
+        batch.map((chunk, index) =>
+          db.documentChunk.create({
+            data: {
+              documentId: document.id,
+              userId: document.userId,
+              chatbotId: document.chatbotId,
+              chunkIndex: chunk.chunkIndex,
+              content: chunk.content,
+              embedding: JSON.stringify(embeddings[index]),
+            },
+          }),
+        ),
+      );
     }
 
     return db.document.update({
@@ -204,7 +213,7 @@ export async function reprocessDocument(userId: string, chatbotId: string, docum
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
   }
 
-  if (document.status !== "failed") {
+  if (!canReprocessDocument(document.status, document.createdAt)) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.reprocessOnlyFailed);
   }
 

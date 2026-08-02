@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { canReprocessDocument } from "@/lib/documentStatus";
+
 type DocumentListProps = {
   chatbotId: string;
   documents: Array<{
@@ -38,8 +40,10 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
     documentId: string;
     action: "delete" | "reprocess";
   } | null>(null);
-  const hasActiveProcessingDocument = documents.some((document) =>
-    ["uploaded", "processing"].includes(document.status),
+  const hasActiveProcessingDocument = documents.some(
+    (document) =>
+      ["uploaded", "processing"].includes(document.status) &&
+      !canReprocessDocument(document.status, document.createdAt),
   );
 
   useEffect(() => {
@@ -156,7 +160,14 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
         </div>
       ) : null}
 
-      {filteredDocuments.map((document) => (
+      {filteredDocuments.map((document) => {
+        const canReprocess = canReprocessDocument(document.status, document.createdAt);
+        const displayStatus =
+          canReprocess && ["uploaded", "processing"].includes(document.status)
+            ? "Processing stalled"
+            : (statusLabel[document.status] ?? document.status);
+
+        return (
         <div
           key={document.id}
           className="flex flex-col gap-3 border-b border-slate-100 p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
@@ -187,9 +198,9 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
             <span
               className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusClass[document.status]}`}
             >
-              {statusLabel[document.status] ?? document.status}
+              {displayStatus}
             </span>
-            {document.status === "failed" ? (
+            {canReprocess ? (
               <button
                 type="button"
                 onClick={() => reprocessUploadedDocument(document.id)}
@@ -222,7 +233,8 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
             </button>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

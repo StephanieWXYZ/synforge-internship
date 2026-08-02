@@ -11,6 +11,15 @@ type ChatAnswerInput = {
 };
 
 export async function generateEmbedding(text: string): Promise<number[]> {
+  const [embedding] = await generateEmbeddings([text]);
+  return embedding;
+}
+
+export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) {
+    return [];
+  }
+
   const config = await getLlmRuntimeConfig();
   const response = await fetch(`${config.baseUrl}/embeddings`, {
     method: "POST",
@@ -20,7 +29,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     },
     body: JSON.stringify({
       model: config.embeddingModel,
-      input: text,
+      input: texts,
     }),
   });
 
@@ -29,13 +38,22 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   const data = (await response.json()) as {
-    data?: Array<{ embedding?: number[] }>;
+    data?: Array<{ index?: number; embedding?: number[] }>;
   };
-  const embedding = data.data?.[0]?.embedding;
-  if (!embedding) {
-    throw new Error("Embedding response did not include an embedding.");
+
+  const embeddings = new Array<number[] | undefined>(texts.length);
+  for (const [position, item] of (data.data ?? []).entries()) {
+    const index = item.index ?? position;
+    if (index >= 0 && index < embeddings.length && item.embedding) {
+      embeddings[index] = item.embedding;
+    }
   }
-  return embedding;
+
+  if (embeddings.some((embedding) => !embedding)) {
+    throw new Error("Embedding response did not include every requested embedding.");
+  }
+
+  return embeddings as number[][];
 }
 
 export async function generateChatAnswer(input: ChatAnswerInput): Promise<string> {
