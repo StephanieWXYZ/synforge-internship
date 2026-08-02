@@ -5,6 +5,7 @@ import * as cdk from "aws-cdk-lib";
 import * as amplify from "aws-cdk-lib/aws-amplify";
 import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpUrlIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -212,6 +213,43 @@ export class MultiPersonaStack extends cdk.Stack {
       }),
     );
 
+    const documentDeadLetterAlarm = new cloudwatch.Alarm(this, "DocumentDeadLetterAlarm", {
+      alarmName: `${baseName}-document-dlq-not-empty`,
+      alarmDescription: "A document processing job exhausted its retries and entered the DLQ.",
+      metric: documentDeadLetterQueue.metricApproximateNumberOfMessagesVisible({
+        period: cdk.Duration.minutes(1),
+        statistic: "Maximum",
+      }),
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    const documentQueueAgeAlarm = new cloudwatch.Alarm(this, "DocumentQueueAgeAlarm", {
+      alarmName: `${baseName}-document-queue-age`,
+      alarmDescription: "The oldest document processing job has waited for at least 20 minutes.",
+      metric: documentQueue.metricApproximateAgeOfOldestMessage({
+        period: cdk.Duration.minutes(5),
+        statistic: "Maximum",
+      }),
+      threshold: cdk.Duration.minutes(20).toSeconds(),
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    const documentWorkerErrorAlarm = new cloudwatch.Alarm(this, "DocumentWorkerErrorAlarm", {
+      alarmName: `${baseName}-document-worker-errors`,
+      alarmDescription: "The document queue dispatcher returned at least one error in five minutes.",
+      metric: documentWorker.metricErrors({
+        period: cdk.Duration.minutes(5),
+        statistic: "Sum",
+      }),
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+
     const api = new apigwv2.HttpApi(this, "HttpApi", {
       apiName: `${baseName}-http-api`,
       corsPreflight: {
@@ -262,6 +300,15 @@ export class MultiPersonaStack extends cdk.Stack {
       value: documentDeadLetterQueue.queueUrl,
     });
     new cdk.CfnOutput(this, "DocumentWorkerName", { value: documentWorker.functionName });
+    new cdk.CfnOutput(this, "DocumentDeadLetterAlarmName", {
+      value: documentDeadLetterAlarm.alarmName,
+    });
+    new cdk.CfnOutput(this, "DocumentQueueAgeAlarmName", {
+      value: documentQueueAgeAlarm.alarmName,
+    });
+    new cdk.CfnOutput(this, "DocumentWorkerErrorAlarmName", {
+      value: documentWorkerErrorAlarm.alarmName,
+    });
   }
 }
 

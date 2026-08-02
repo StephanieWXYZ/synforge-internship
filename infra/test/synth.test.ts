@@ -28,6 +28,7 @@ test("synthesizes Amplify SSR and an API Gateway proxy", () => {
   template.resourceCountIs("AWS::SQS::Queue", 2);
   template.resourceCountIs("AWS::Lambda::Function", 1);
   template.resourceCountIs("AWS::Lambda::EventSourceMapping", 1);
+  template.resourceCountIs("AWS::CloudWatch::Alarm", 3);
   template.hasResourceProperties("AWS::Amplify::App", { Platform: "WEB_COMPUTE" });
   template.hasResourceProperties("AWS::Amplify::Branch", {
     EnableAutoBuild: true,
@@ -56,6 +57,12 @@ test("synthesizes Amplify SSR and an API Gateway proxy", () => {
   assert.match(json, /sqs:SendMessage/);
   assert.match(json, /ReportBatchItemFailures/);
   assert.match(json, /document-dlq\.fifo/);
+  assert.match(json, /document-dlq-not-empty/);
+  assert.match(json, /document-queue-age/);
+  assert.match(json, /document-worker-errors/);
+  assert.match(json, /ApproximateAgeOfOldestMessage/);
+  assert.match(json, /ApproximateNumberOfMessagesVisible/);
+  assert.match(json, /AWS\/Lambda/);
   assert.match(json, /DOCUMENT_QUEUE_URL/);
   assert.match(json, /CorsConfiguration/);
   assert.match(json, /secretsmanager:GetSecretValue/);

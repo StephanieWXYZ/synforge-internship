@@ -46,3 +46,11 @@ route. Failed jobs are retried up to five times before moving to the FIFO dead-l
 
 Local development remains synchronous when `DOCUMENT_QUEUE_URL` is empty. Document status uses
 `updatedAt` so queued or processing jobs become manually retryable after 20 minutes.
+
+CloudWatch alarms monitor the asynchronous pipeline:
+
+- `multi-persona-dev-document-dlq-not-empty` alarms when at least one job reaches the DLQ.
+- `multi-persona-dev-document-queue-age` alarms when the oldest queued job is at least 20 minutes old.
+- `multi-persona-dev-document-worker-errors` alarms when the dispatcher records an error in a five-minute window.
+
+The alarms intentionally have no notification action until an SNS, email, or chat destination is selected.
