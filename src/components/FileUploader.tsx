@@ -63,7 +63,7 @@ export function FileUploader({ chatbotId }: FileUploaderProps) {
       <label className="block text-sm font-medium text-slate-700" htmlFor="file">
         Upload PDF, TXT, or DOCX
       </label>
-      <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <input
           id="file"
           name="file"
@@ -71,7 +71,7 @@ export function FileUploader({ chatbotId }: FileUploaderProps) {
           accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           required
           disabled={isUploading}
-          className="min-h-11 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
+          className="min-h-11 min-w-0 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
         />
         <button
           type="submit"
