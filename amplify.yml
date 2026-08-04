@@ -1,0 +1,20 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+        - env | grep -e DYNAMODB_TABLE_NAME -e RUNTIME_SECRET_NAME -e UPLOAD_BUCKET_NAME -e VECTOR_STORE -e VECTOR_BUCKET_NAME -e VECTOR_INDEX_NAME -e VECTOR_DIMENSION -e VECTOR_EMBEDDING_VERSION -e DOCUMENT_QUEUE_URL -e WORKER_SECRET_NAME >> .env.production
+        - npm run prisma:generate
+    build:
+      commands:
+        - npm run build
+        - npm run verify:deployment
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*

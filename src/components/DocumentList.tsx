@@ -5,6 +5,7 @@ import { FileText, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { filterDocumentsByFileName } from "@/lib/documentList";
+import { canReprocessDocument } from "@/lib/documentStatus";
 
 type DocumentListProps = {
   chatbotId: string;
@@ -14,12 +15,14 @@ type DocumentListProps = {
     fileType: string;
     status: string;
     createdAt: Date;
+    updatedAt: Date;
     _count?: { chunks: number };
   }>;
 };
 
 const statusClass: Record<string, string> = {
   uploaded: "bg-slate-100 text-slate-700",
+  queued: "bg-blue-100 text-blue-800",
   processing: "bg-amber-100 text-amber-800",
   ready: "bg-emerald-100 text-emerald-800",
   failed: "bg-rose-100 text-rose-800",
@@ -27,6 +30,7 @@ const statusClass: Record<string, string> = {
 
 const statusLabel: Record<string, string> = {
   uploaded: "Processing document...",
+  queued: "Queued for processing...",
   processing: "Processing document...",
   ready: "Ready",
   failed: "Processing failed",
@@ -40,8 +44,10 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
     documentId: string;
     action: "delete" | "reprocess";
   } | null>(null);
-  const hasActiveProcessingDocument = documents.some((document) =>
-    ["uploaded", "processing"].includes(document.status),
+  const hasActiveProcessingDocument = documents.some(
+    (document) =>
+      ["uploaded", "queued", "processing"].includes(document.status) &&
+      !canReprocessDocument(document.status, document.updatedAt ?? document.createdAt),
   );
 
   useEffect(() => {
@@ -150,7 +156,17 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
         </div>
       ) : null}
 
-      {filteredDocuments.map((document) => (
+      {filteredDocuments.map((document) => {
+        const canReprocess = canReprocessDocument(
+          document.status,
+          document.updatedAt ?? document.createdAt,
+        );
+        const displayStatus =
+          canReprocess && ["uploaded", "queued", "processing"].includes(document.status)
+            ? "Processing stalled"
+            : (statusLabel[document.status] ?? document.status);
+
+        return (
         <div
           key={document.id}
           className="flex flex-col gap-3 border-b border-slate-100 p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
@@ -181,9 +197,9 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
             <span
               className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusClass[document.status]}`}
             >
-              {statusLabel[document.status] ?? document.status}
+              {displayStatus}
             </span>
-            {document.status === "failed" ? (
+            {canReprocess ? (
               <button
                 type="button"
                 onClick={() => reprocessUploadedDocument(document.id)}
@@ -216,7 +232,8 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
             </button>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

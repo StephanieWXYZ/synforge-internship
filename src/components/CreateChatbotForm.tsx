@@ -128,6 +128,9 @@ export function CreateChatbotForm() {
     <form onSubmit={onSubmit} className="mt-8 space-y-5 rounded-lg border border-slate-200 bg-white p-6">
       <fieldset disabled={isSubmitting}>
         <legend className="text-sm font-medium text-slate-700">Start from template</legend>
+        <p className="mt-1 text-sm leading-6 text-slate-500">
+          Switching templates replaces the current form values. You can edit every field before saving.
+        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"

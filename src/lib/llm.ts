@@ -1,3 +1,4 @@
+import { getLlmRuntimeConfig } from "@/lib/runtimeConfig";
 import {
   buildDocumentOnlySystemPrompt,
   buildDocumentQuestionPrompt,
@@ -9,26 +10,26 @@ type ChatAnswerInput = {
   question: string;
 };
 
-const baseUrl = process.env.LLM_BASE_URL ?? "https://api.openai.com/v1";
-
-function getApiKey() {
-  const apiKey = process.env.LLM_API_KEY;
-  if (!apiKey) {
-    throw new Error("LLM_API_KEY is required to call the LLM provider.");
-  }
-  return apiKey;
+export async function generateEmbedding(text: string): Promise<number[]> {
+  const [embedding] = await generateEmbeddings([text]);
+  return embedding;
 }
 
-export async function generateEmbedding(text: string): Promise<number[]> {
-  const response = await fetch(`${baseUrl}/embeddings`, {
+export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) {
+    return [];
+  }
+
+  const config = await getLlmRuntimeConfig();
+  const response = await fetch(`${config.baseUrl}/embeddings`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${getApiKey()}`,
+      Authorization: `Bearer ${config.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.EMBEDDING_MODEL ?? "text-embedding-3-small",
-      input: text,
+      model: config.embeddingModel,
+      input: texts,
     }),
   });
 
@@ -37,24 +38,34 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   const data = (await response.json()) as {
-    data?: Array<{ embedding?: number[] }>;
+    data?: Array<{ index?: number; embedding?: number[] }>;
   };
-  const embedding = data.data?.[0]?.embedding;
-  if (!embedding) {
-    throw new Error("Embedding response did not include an embedding.");
+
+  const embeddings = new Array<number[] | undefined>(texts.length);
+  for (const [position, item] of (data.data ?? []).entries()) {
+    const index = item.index ?? position;
+    if (index >= 0 && index < embeddings.length && item.embedding) {
+      embeddings[index] = item.embedding;
+    }
   }
-  return embedding;
+
+  if (embeddings.some((embedding) => !embedding)) {
+    throw new Error("Embedding response did not include every requested embedding.");
+  }
+
+  return embeddings as number[][];
 }
 
 export async function generateChatAnswer(input: ChatAnswerInput): Promise<string> {
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const config = await getLlmRuntimeConfig();
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${getApiKey()}`,
+      Authorization: `Bearer ${config.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.LLM_MODEL ?? "gpt-4.1-mini",
+      model: config.chatModel,
       temperature: 0.2,
       messages: [
         {

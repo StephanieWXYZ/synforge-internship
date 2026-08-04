@@ -30,30 +30,79 @@ export function FileUploader({ chatbotId }: FileUploaderProps) {
     const form = event.currentTarget;
     setError("");
     setUploadStatus("uploading");
-    const processingTimer = window.setTimeout(() => {
-      setUploadStatus("processing");
-    }, 500);
+    const fileInput = form.elements.namedItem("file") as HTMLInputElement | null;
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      setError("Choose a file to upload.");
+      setUploadStatus("idle");
+      return;
+    }
 
-    const formData = new FormData(form);
-    formData.set("chatbotId", chatbotId);
+    const metadata = {
+      chatbotId,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+    };
+
+    async function readError(response: Response) {
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const data = (await response.json()) as { error?: string };
+        return data.error;
+      }
+      return response.text();
+    }
 
     try {
-      const response = await fetch("/api/documents", {
+      const uploadRequest = await fetch("/api/documents/upload-url", {
         method: "POST",
-        body: formData,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(metadata),
       });
 
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        setError(data.error ?? "Upload failed. Please try again.");
-      } else {
-        form.reset();
-        router.refresh();
+      if (!uploadRequest.ok) {
+        throw new Error((await readError(uploadRequest)) || "Upload failed. Please try again.");
       }
-    } catch {
-      setError("Upload failed. Please try again.");
+
+      const upload = (await uploadRequest.json()) as
+        | { directUpload: false }
+        | { directUpload: true; uploadUrl: string; filePath: string };
+
+      let response: Response;
+      if (upload.directUpload) {
+        const s3Response = await fetch(upload.uploadUrl, {
+          method: "PUT",
+          headers: { "content-type": file.type },
+          body: file,
+        });
+        if (!s3Response.ok) {
+          throw new Error("Could not upload the file to document storage.");
+        }
+
+        setUploadStatus("processing");
+        response = await fetch("/api/documents", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...metadata, filePath: upload.filePath }),
+        });
+      } else {
+        const formData = new FormData();
+        formData.set("chatbotId", chatbotId);
+        formData.set("file", file);
+        setUploadStatus("processing");
+        response = await fetch("/api/documents", { method: "POST", body: formData });
+      }
+
+      if (!response.ok) {
+        throw new Error((await readError(response)) || "Upload failed. Please try again.");
+      }
+
+      form.reset();
+      router.refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Upload failed. Please try again.");
     } finally {
-      window.clearTimeout(processingTimer);
       setUploadStatus("idle");
     }
   }
@@ -63,7 +112,7 @@ export function FileUploader({ chatbotId }: FileUploaderProps) {
       <label className="block text-sm font-medium text-slate-700" htmlFor="file">
         Upload PDF, TXT, or DOCX
       </label>
-      <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <input
           id="file"
           name="file"
@@ -71,7 +120,7 @@ export function FileUploader({ chatbotId }: FileUploaderProps) {
           accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           required
           disabled={isUploading}
-          className="min-h-11 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
+          className="min-h-11 min-w-0 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
         />
         <button
           type="submit"

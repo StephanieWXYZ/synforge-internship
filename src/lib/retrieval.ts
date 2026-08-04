@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { generateEmbedding } from "@/lib/llm";
-import { cosineSimilarity, parseEmbedding } from "@/lib/similarity";
+import { getVectorStore } from "@/lib/vectorStore";
 
 export type RetrievedChunk = {
   chunkId: string;
@@ -17,28 +17,39 @@ export async function retrieveRelevantChunks(
   question: string,
   limit = 5,
 ): Promise<RetrievedChunk[]> {
-  const chunks = await db.documentChunk.findMany({
-    where: { chatbotId, userId },
-    include: { document: true },
+  const matches = await getVectorStore().query({
+    userId,
+    chatbotId,
+    limit,
+    getQueryVector: () => generateEmbedding(question),
   });
 
-  if (chunks.length === 0) {
+  if (matches.length === 0) {
     return [];
   }
 
-  const questionEmbedding = await generateEmbedding(question);
+  const chunks = await db.documentChunk.findMany({
+    where: {
+      id: { in: matches.map((match) => match.chunkId) },
+      chatbotId,
+      userId,
+    },
+    include: { document: true },
+  });
+  const chunksById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
 
-  return chunks
-    .map((chunk) => ({
+  return matches.flatMap((match) => {
+    const chunk = chunksById.get(match.chunkId);
+    if (!chunk) return [];
+    return [{
       chunkId: chunk.id,
       documentId: chunk.documentId,
       fileName: chunk.document.fileName,
       chunkIndex: chunk.chunkIndex,
       content: chunk.content,
-      score: cosineSimilarity(questionEmbedding, parseEmbedding(chunk.embedding)),
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+      score: match.score,
+    }];
+  });
 }
 
 export function buildContext(chunks: RetrievedChunk[]) {

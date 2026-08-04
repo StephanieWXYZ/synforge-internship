@@ -54,7 +54,7 @@ export default async function ChatbotPage({ params }: ChatbotPageProps) {
           </div>
         </section>
 
-        <aside className="rounded-lg border border-slate-200 bg-white p-5">
+        <aside className="self-start rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="font-semibold text-slate-950">Knowledge base</h2>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-md bg-slate-50 p-3">
@@ -81,7 +81,9 @@ export default async function ChatbotPage({ params }: ChatbotPageProps) {
       </div>
 
       <section className="mt-8 grid gap-5 lg:grid-cols-[420px_1fr]">
-        <FileUploader chatbotId={chatbot.id} />
+        <div className="min-w-0 self-start">
+          <FileUploader chatbotId={chatbot.id} />
+        </div>
         <DocumentList chatbotId={chatbot.id} documents={chatbot.documents} />
       </section>
     </main>

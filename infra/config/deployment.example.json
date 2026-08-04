@@ -1,0 +1,20 @@
+{
+  "awsAccountId": "111111111111",
+  "awsRegion": "us-east-1",
+  "projectName": "multi-persona",
+  "stageName": "dev",
+  "github": {
+    "owner": "FILL_ME_GITHUB_OWNER",
+    "repo": "multi-persona",
+    "branch": "main"
+  },
+  "hosting": {
+    "appName": "multi-persona-dev-web",
+    "amplifyGithubTokenSecretName": "FILL_ME_GITHUB_TOKEN_SECRET_NAME",
+    "runtimeSecretName": "FILL_ME_RUNTIME_SECRET_NAME",
+    "vectorStore": "database"
+  },
+  "monitoring": {
+    "alertEmail": "alerts@example.com"
+  }
+}

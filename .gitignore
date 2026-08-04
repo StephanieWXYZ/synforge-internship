@@ -44,3 +44,9 @@ next-env.d.ts
 /uploads
 /prisma/dev.db
 /prisma/dev.db-journal
+
+# Local AWS deployment configuration and synthesized templates
+/infra/config/deployment.json
+/cdk.out/
+/infra/cdk.out/
+/infra/node_modules/

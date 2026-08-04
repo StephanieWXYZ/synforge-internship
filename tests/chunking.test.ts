@@ -20,4 +20,13 @@ describe("chunkText", () => {
   it("ignores empty input", () => {
     expect(chunkText(" \n\n\t ")).toEqual([]);
   });
+
+  it("always advances when an early paragraph boundary is shorter than the overlap", () => {
+    const text = `${"A".repeat(100)}\n\n${"B".repeat(5_000)}`;
+    const chunks = chunkText(text);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.length).toBeLessThan(10);
+    expect(chunks.at(-1)?.content).toContain("B");
+  });
 });

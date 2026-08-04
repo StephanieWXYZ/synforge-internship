@@ -31,7 +31,7 @@ export function chunkText(text: string, options: ChunkOptions = {}): TextChunk[]
 
     if (end < normalized.length) {
       const boundary = findBoundary(normalized, start, end);
-      if (boundary > start + minSize) {
+      if (boundary > start + Math.max(minSize, overlap)) {
         end = boundary;
       }
     }
@@ -45,7 +45,7 @@ export function chunkText(text: string, options: ChunkOptions = {}): TextChunk[]
       break;
     }
 
-    start = Math.max(0, end - overlap);
+    start = Math.max(start + 1, end - overlap);
     while (start < normalized.length && /\s/.test(normalized[start])) {
       start += 1;
     }
