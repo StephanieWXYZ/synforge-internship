@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { FileText, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { filterDocumentsByFileName } from "@/lib/documentList";
+
 type DocumentListProps = {
   chatbotId: string;
   documents: Array<{
@@ -57,15 +59,7 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
   }, [hasActiveProcessingDocument, router]);
 
   const filteredDocuments = useMemo(() => {
-    const normalizedSearchTerm = searchTerm.trim().toLowerCase();
-
-    if (!normalizedSearchTerm) {
-      return documents;
-    }
-
-    return documents.filter((document) =>
-      document.fileName.toLowerCase().includes(normalizedSearchTerm),
-    );
+    return filterDocumentsByFileName(documents, searchTerm);
   }, [documents, searchTerm]);
 
   async function deleteUploadedDocument(documentId: string, fileName: string) {
