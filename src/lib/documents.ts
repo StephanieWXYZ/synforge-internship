@@ -203,7 +203,13 @@ async function deleteDocumentChunks(document: StoredDocument) {
     },
   });
   await getVectorStore().delete(chunks.map((chunk) => chunk.id));
-  await db.documentChunk.deleteMany({ where: { documentId: document.id } });
+  await db.documentChunk.deleteMany({
+    where: {
+      documentId: document.id,
+      chatbotId: document.chatbotId,
+      userId: document.userId,
+    },
+  });
 }
 
 export async function saveAndProcessDocument(userId: string, chatbotId: string, file: File) {

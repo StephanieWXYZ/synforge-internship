@@ -9,7 +9,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const uploadRoot = path.join(process.cwd(), "uploads");
+const uploadRoot = path.resolve(process.cwd(), "uploads");
 const uploadBucketName = process.env.UPLOAD_BUCKET_NAME?.trim();
 
 let s3Client: S3Client | undefined;
@@ -21,6 +21,17 @@ function getS3Client() {
 
 export function usesRemoteDocumentStorage() {
   return Boolean(uploadBucketName);
+}
+
+function resolveUploadPath(filePath: string) {
+  const resolvedPath = path.resolve(filePath);
+  const relativePath = path.relative(uploadRoot, resolvedPath);
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error("Stored document path is outside the uploads directory.");
+  }
+
+  return resolvedPath;
 }
 
 export function createDocumentStoragePath(
@@ -51,7 +62,7 @@ export async function storeDocument(filePath: string, buffer: Buffer) {
   }
 
   await mkdir(uploadRoot, { recursive: true });
-  await writeFile(filePath, buffer);
+  await writeFile(resolveUploadPath(filePath), buffer);
 }
 
 export async function createDocumentUploadUrl(filePath: string, contentType: string) {
@@ -83,7 +94,7 @@ export async function readStoredDocument(filePath: string) {
     return Buffer.from(await response.Body.transformToByteArray());
   }
 
-  return readFile(filePath);
+  return readFile(resolveUploadPath(filePath));
 }
 
 export async function getStoredDocumentSize(filePath: string) {
@@ -93,7 +104,7 @@ export async function getStoredDocumentSize(filePath: string) {
     );
     return response.ContentLength ?? 0;
   }
-  return (await readFile(filePath)).length;
+  return (await readFile(resolveUploadPath(filePath))).length;
 }
 
 export async function removeStoredDocument(filePath: string) {
@@ -105,7 +116,7 @@ export async function removeStoredDocument(filePath: string) {
   }
 
   try {
-    await unlink(filePath);
+    await unlink(resolveUploadPath(filePath));
   } catch (error) {
     if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
       throw error;
