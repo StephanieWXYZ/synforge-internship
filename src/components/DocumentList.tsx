@@ -45,9 +45,7 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
     action: "delete" | "reprocess";
   } | null>(null);
   const hasActiveProcessingDocument = documents.some(
-    (document) =>
-      ["uploaded", "queued", "processing"].includes(document.status) &&
-      !canReprocessDocument(document.status, document.updatedAt ?? document.createdAt),
+    (document) => ["uploaded", "queued", "processing"].includes(document.status),
   );
 
   useEffect(() => {
@@ -157,14 +155,7 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
       ) : null}
 
       {filteredDocuments.map((document) => {
-        const canReprocess = canReprocessDocument(
-          document.status,
-          document.updatedAt ?? document.createdAt,
-        );
-        const displayStatus =
-          canReprocess && ["uploaded", "queued", "processing"].includes(document.status)
-            ? "Processing stalled"
-            : (statusLabel[document.status] ?? document.status);
+        const canReprocess = canReprocessDocument(document.status);
 
         return (
         <div
@@ -197,7 +188,7 @@ export function DocumentList({ chatbotId, documents }: DocumentListProps) {
             <span
               className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusClass[document.status]}`}
             >
-              {displayStatus}
+              {statusLabel[document.status] ?? document.status}
             </span>
             {canReprocess ? (
               <button

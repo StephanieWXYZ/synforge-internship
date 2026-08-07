@@ -293,7 +293,7 @@ export async function reprocessDocument(userId: string, chatbotId: string, docum
     throw new Error(DOCUMENT_ERROR_MESSAGES.documentNotFound);
   }
 
-  if (!canReprocessDocument(document.status, document.updatedAt ?? document.createdAt)) {
+  if (!canReprocessDocument(document.status)) {
     throw new Error(DOCUMENT_ERROR_MESSAGES.reprocessOnlyFailed);
   }
 
@@ -329,7 +329,7 @@ export async function processQueuedDocument(
   }
   if (
     document.status === "processing" &&
-    !canReprocessDocument(document.status, document.updatedAt ?? document.createdAt)
+    !canReprocessDocument(document.status)
   ) {
     return document;
   }

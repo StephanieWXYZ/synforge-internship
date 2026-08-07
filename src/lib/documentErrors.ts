@@ -6,7 +6,7 @@ export const DOCUMENT_ERROR_MESSAGES = {
   chatbotNotFound: "Chatbot not found.",
   noReadableText: "No readable text was found in the document.",
   documentNotFound: "Document not found.",
-  reprocessOnlyFailed: "Only failed or stalled documents can be reprocessed.",
+  reprocessOnlyFailed: "Only failed documents can be reprocessed.",
   uploadFailed: "Upload failed.",
   deleteFailed: "Delete failed.",
   reprocessFailed: "Reprocess failed.",
