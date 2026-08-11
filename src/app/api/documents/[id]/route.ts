@@ -14,6 +14,21 @@ function getChatbotId(request: Request) {
   return new URL(request.url).searchParams.get("chatbotId") ?? "";
 }
 
+function getSafeReprocessError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return DOCUMENT_ERROR_MESSAGES.reprocessFailed;
+  }
+
+  if (
+    error.message === DOCUMENT_ERROR_MESSAGES.documentNotFound ||
+    error.message === DOCUMENT_ERROR_MESSAGES.reprocessOnlyFailed
+  ) {
+    return error.message;
+  }
+
+  return DOCUMENT_ERROR_MESSAGES.reprocessFailed;
+}
+
 export async function DELETE(request: Request, { params }: DocumentRouteContext) {
   try {
     const user = await requireApiUser();
@@ -58,7 +73,7 @@ export async function PATCH(request: Request, { params }: DocumentRouteContext) 
     }
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : DOCUMENT_ERROR_MESSAGES.reprocessFailed },
+      { error: getSafeReprocessError(error) },
       { status: 400 },
     );
   }
