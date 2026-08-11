@@ -9,6 +9,8 @@ import {
   destroySession,
   requireUser,
 } from "@/lib/auth";
+import { auditAuth } from "@/lib/authAudit";
+import { isLegacyRegistrationEnabled } from "@/lib/authPolicy";
 import { db } from "@/lib/db";
 
 function authErrorRedirectPath(path: string, error: string) {
@@ -42,7 +44,13 @@ export async function signUpAction(formData: FormData) {
   try {
     const user = await createUserAccount(name, email, password);
     await createSession(user.id);
+    auditAuth("legacy.registration", "success", "completed");
   } catch (error) {
+    auditAuth(
+      "legacy.registration",
+      "failure",
+      isLegacyRegistrationEnabled() ? "unexpected_error" : "registration_disabled",
+    );
     redirectPath = authErrorRedirectPath(
       "/sign-up",
       error instanceof Error ? error.message : "Sign up failed.",
@@ -60,7 +68,9 @@ export async function signInAction(formData: FormData) {
   try {
     const user = await authenticateUser(email, password);
     await createSession(user.id);
+    auditAuth("legacy.signin", "success", "completed");
   } catch (error) {
+    auditAuth("legacy.signin", "failure", "invalid_credentials");
     redirectPath = authErrorRedirectPath(
       "/sign-in",
       error instanceof Error ? error.message : "Sign in failed.",

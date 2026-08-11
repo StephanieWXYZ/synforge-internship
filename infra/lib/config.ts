@@ -19,6 +19,13 @@ export interface DeploymentConfig {
     runtimeSecretName: string;
     vectorStore: "database" | "s3-vectors";
   };
+  identity: {
+    issuer: string;
+    domain: string;
+    clientId: string;
+    appUrl: string;
+    rolloutEnabled: boolean;
+  };
   monitoring?: {
     alertEmail?: string;
   };
@@ -70,6 +77,13 @@ export function loadConfig(configPath = resolveConfigPath()): DeploymentConfig {
       vectorStore:
         parsed.hosting?.vectorStore === "s3-vectors" ? "s3-vectors" : "database",
     },
+    identity: {
+      issuer: parsed.identity?.issuer?.trim() ?? "",
+      domain: parsed.identity?.domain?.trim() ?? "",
+      clientId: parsed.identity?.clientId?.trim() ?? "",
+      appUrl: parsed.identity?.appUrl?.trim() ?? "",
+      rolloutEnabled: parsed.identity?.rolloutEnabled === true,
+    },
     monitoring: {
       alertEmail: parsed.monitoring?.alertEmail?.trim() ?? "",
     },
@@ -103,10 +117,29 @@ export function validateDeploymentReady(config: DeploymentConfig): void {
     ["hosting.appName", config.hosting.appName],
     ["hosting.amplifyGithubTokenSecretName", config.hosting.amplifyGithubTokenSecretName],
     ["hosting.runtimeSecretName", config.hosting.runtimeSecretName],
+    ["identity.issuer", config.identity.issuer],
+    ["identity.domain", config.identity.domain],
+    ["identity.clientId", config.identity.clientId],
+    ["identity.appUrl", config.identity.appUrl],
   ] as const) {
     if (!value || /FILL_ME|REPLACE|PLACEHOLDER/i.test(value)) {
       throw new Error(`${name} must be configured before deployment.`);
     }
+  }
+
+  for (const [name, value] of [
+    ["identity.issuer", config.identity.issuer],
+    ["identity.domain", config.identity.domain],
+    ["identity.appUrl", config.identity.appUrl],
+  ] as const) {
+    try {
+      if (new URL(value).protocol !== "https:") throw new Error();
+    } catch {
+      throw new Error(`${name} must be a valid HTTPS URL.`);
+    }
+  }
+  if (!/^[a-z0-9]+$/.test(config.identity.clientId)) {
+    throw new Error("identity.clientId must be a Cognito public client id.");
   }
 
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(config.github.owner)) {

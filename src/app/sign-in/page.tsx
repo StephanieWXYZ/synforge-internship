@@ -21,11 +21,24 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
       <div>
         <h1 className="text-3xl font-semibold text-slate-950">Sign in</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Use your account to access your chatbots and documents.
+          Use one SyncForge account across Forge, Experts, Wuxia, and Marketing.
         </p>
       </div>
 
-      <form action={signInAction} className="mt-8 space-y-5 rounded-lg border border-slate-200 bg-white p-6">
+      <a
+        href="/api/auth/signin"
+        className="mt-8 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-700 px-4 text-sm font-semibold text-white transition hover:bg-blue-800"
+      >
+        Continue with SyncForge
+      </a>
+
+      <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
+        <span className="h-px flex-1 bg-slate-200" />
+        Legacy account migration
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <form action={signInAction} className="space-y-5 rounded-lg border border-slate-200 bg-white p-6">
         {error ? (
           <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
         ) : null}
@@ -62,7 +75,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
       </form>
 
       <p className="mt-5 text-center text-sm text-slate-600">
-        No account yet?{" "}
+        New users should continue with SyncForge. Need a temporary legacy account?{" "}
         <Link href="/sign-up" className="font-semibold text-blue-700 hover:text-blue-800">
           Sign up
         </Link>

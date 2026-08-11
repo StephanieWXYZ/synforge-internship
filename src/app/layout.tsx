@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 
-import { signOutAction } from "@/app/actions";
 import { getCurrentUser } from "@/lib/auth";
+import { isLegacyRegistrationEnabled } from "@/lib/authPolicy";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,6 +27,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
+  const legacyRegistrationEnabled = isLegacyRegistrationEnabled();
 
   return (
     <html
@@ -42,7 +43,15 @@ export default async function RootLayout({
             {user ? (
               <div className="flex items-center gap-3 text-sm">
                 <span className="hidden text-slate-500 sm:inline">{user.email}</span>
-                <form action={signOutAction}>
+                {!user.oidcSubject ? (
+                  <a
+                    href="/api/auth/signin?intent=link"
+                    className="rounded-md bg-blue-700 px-3 py-2 font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    Connect SyncForge account
+                  </a>
+                ) : null}
+                <form action="/api/auth/signout" method="post">
                   <button
                     type="submit"
                     className="rounded-md border border-slate-300 px-3 py-2 font-medium text-slate-700 transition hover:border-blue-300 hover:text-blue-700"
@@ -59,12 +68,21 @@ export default async function RootLayout({
                 >
                   Sign in
                 </Link>
-                <Link
-                  href="/sign-up"
-                  className="rounded-md bg-blue-700 px-3 py-2 font-semibold text-white transition hover:bg-blue-800"
-                >
-                  Sign up
-                </Link>
+                {legacyRegistrationEnabled ? (
+                  <Link
+                    href="/sign-up"
+                    className="rounded-md bg-blue-700 px-3 py-2 font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    Sign up
+                  </Link>
+                ) : (
+                  <a
+                    href="/api/auth/signin"
+                    className="rounded-md bg-blue-700 px-3 py-2 font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    Continue with SyncForge
+                  </a>
+                )}
               </nav>
             )}
           </div>

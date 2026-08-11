@@ -27,6 +27,10 @@ function entityKey(entity: string, id: string) {
   return `${entity.toUpperCase()}#${id}`;
 }
 
+function oidcIdentityId(issuer: string, subject: string) {
+  return Buffer.from(JSON.stringify([issuer, subject])).toString("base64url");
+}
+
 function asString(value: unknown) {
   return typeof value === "string" ? value : "";
 }
@@ -186,6 +190,17 @@ export function createDynamoDb(tableName: string) {
     user: {
       async findUnique({ where }: { where: Where }) {
         if (where.id) return publicItem(await get("user", asString(where.id)));
+        if (where.oidcIssuer_oidcSubject) {
+          const identity = where.oidcIssuer_oidcSubject as Where;
+          const claim = await get(
+            "oidc",
+            oidcIdentityId(
+              asString(identity.oidcIssuer),
+              asString(identity.oidcSubject),
+            ),
+          );
+          return claim ? publicItem(await get("user", asString(claim.userId))) : null;
+        }
         const email = asString(where.email).toLowerCase();
         const emailClaim = await get("email", email);
         return emailClaim ? publicItem(await get("user", asString(emailClaim.userId))) : null;
@@ -200,10 +215,28 @@ export function createDynamoDb(tableName: string) {
           id,
           email,
           name: asString(data.name),
-          passwordHash: asString(data.passwordHash),
-          passwordSalt: asString(data.passwordSalt),
+          passwordHash: asOptionalString(data.passwordHash),
+          passwordSalt: asOptionalString(data.passwordSalt),
+          oidcIssuer: asOptionalString(data.oidcIssuer),
+          oidcSubject: asOptionalString(data.oidcSubject),
+          emailVerified: data.emailVerified === true,
           createdAt,
         };
+        const oidcIssuer = asOptionalString(data.oidcIssuer);
+        const oidcSubject = asOptionalString(data.oidcSubject);
+        const identityClaim = oidcIssuer && oidcSubject
+          ? {
+              Put: {
+                TableName: tableName,
+                Item: {
+                  pk: entityKey("oidc", oidcIdentityId(oidcIssuer, oidcSubject)),
+                  entity: "OidcClaim",
+                  userId: id,
+                },
+                ConditionExpression: "attribute_not_exists(pk)",
+              },
+            }
+          : null;
         await client.send(
           new TransactWriteCommand({
             TransactItems: [
@@ -214,6 +247,7 @@ export function createDynamoDb(tableName: string) {
                   ConditionExpression: "attribute_not_exists(pk)",
                 },
               },
+              ...(identityClaim ? [identityClaim] : []),
               {
                 Put: {
                   TableName: tableName,
@@ -225,6 +259,47 @@ export function createDynamoDb(tableName: string) {
           }),
         );
         return publicItem(user);
+      },
+      async update({ where, data }: { where: Where; data: Data }) {
+        const id = asString(where.id);
+        const existing = await get("user", id);
+        if (!existing) throw new Error("User not found.");
+        const oidcIssuer = asOptionalString(data.oidcIssuer);
+        const oidcSubject = asOptionalString(data.oidcSubject);
+        const updated = {
+          ...existing,
+          ...data,
+          id,
+          email: asString(data.email || existing.email).toLowerCase(),
+        };
+        const identityClaim = oidcIssuer && oidcSubject
+          ? {
+              Put: {
+                TableName: tableName,
+                Item: {
+                  pk: entityKey("oidc", oidcIdentityId(oidcIssuer, oidcSubject)),
+                  entity: "OidcClaim",
+                  userId: id,
+                },
+                ConditionExpression: "attribute_not_exists(pk)",
+              },
+            }
+          : null;
+        await client.send(
+          new TransactWriteCommand({
+            TransactItems: [
+              ...(identityClaim ? [identityClaim] : []),
+              {
+                Put: {
+                  TableName: tableName,
+                  Item: updated,
+                  ConditionExpression: "attribute_exists(pk)",
+                },
+              },
+            ],
+          }),
+        );
+        return publicItem(updated);
       },
     },
     session: {

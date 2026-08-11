@@ -179,14 +179,21 @@ export class MultiPersonaStack extends cdk.Stack {
       ],
     });
 
-    const amplifyBranch = new amplify.CfnBranch(this, "AmplifyBranch", {
+    const amplifyOrigin = `https://${props.config.github.branch}.${amplifyApp.attrDefaultDomain}`;
+    new amplify.CfnBranch(this, "AmplifyBranch", {
       appId: amplifyApp.attrAppId,
       branchName: props.config.github.branch,
       enableAutoBuild: true,
       framework: "Next.js - SSR",
       stage: amplifyStage(props.config.stageName),
+      environmentVariables: [
+        { name: "COGNITO_ISSUER", value: props.config.identity.issuer },
+        { name: "COGNITO_DOMAIN", value: props.config.identity.domain },
+        { name: "COGNITO_CLIENT_ID", value: props.config.identity.clientId },
+        { name: "NEXT_PUBLIC_APP_URL", value: props.config.identity.appUrl },
+        { name: "OIDC_ROLLOUT_ENABLED", value: String(props.config.identity.rolloutEnabled) },
+      ],
     });
-    const amplifyOrigin = `https://${amplifyBranch.branchName}.${amplifyApp.attrDefaultDomain}`;
 
     const documentWorker = new lambdaNodejs.NodejsFunction(this, "DocumentWorker", {
       functionName: `${baseName}-document-worker`,

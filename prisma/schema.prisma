@@ -95,18 +95,23 @@ model Message {
 }
 
 model User {
-  id           String          @id @default(cuid())
-  email        String          @unique
-  name         String
-  passwordHash String
-  passwordSalt String
-  createdAt    DateTime        @default(now())
-  chatbots     Chatbot[]
-  documents    Document[]
-  chunks       DocumentChunk[]
+  id            String          @id @default(cuid())
+  email         String          @unique
+  name          String
+  passwordHash  String?
+  passwordSalt  String?
+  oidcIssuer    String?
+  oidcSubject   String?
+  emailVerified Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  chatbots      Chatbot[]
+  documents     Document[]
+  chunks        DocumentChunk[]
   conversations Conversation[]
-  messages     Message[]
-  sessions     Session[]
+  messages      Message[]
+  sessions      Session[]
+
+  @@unique([oidcIssuer, oidcSubject])
 }
 
 model Session {

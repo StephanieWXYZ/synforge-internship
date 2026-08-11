@@ -35,6 +35,13 @@ test("synthesizes Amplify SSR and an API Gateway proxy", () => {
   template.hasResourceProperties("AWS::Amplify::Branch", {
     EnableAutoBuild: true,
     Framework: "Next.js - SSR",
+    EnvironmentVariables: [
+      { Name: "COGNITO_ISSUER", Value: config.identity.issuer },
+      { Name: "COGNITO_DOMAIN", Value: config.identity.domain },
+      { Name: "COGNITO_CLIENT_ID", Value: config.identity.clientId },
+      { Name: "NEXT_PUBLIC_APP_URL", Value: config.identity.appUrl },
+      { Name: "OIDC_ROLLOUT_ENABLED", Value: "false" },
+    ],
   });
 
   const json = JSON.stringify(template.toJSON());

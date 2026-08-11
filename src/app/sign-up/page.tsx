@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { signUpAction } from "@/app/actions";
 import { getCurrentUser } from "@/lib/auth";
+import { isLegacyRegistrationEnabled } from "@/lib/authPolicy";
 
 type SignUpPageProps = {
   searchParams: Promise<{ error?: string }>;
@@ -15,6 +16,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   }
 
   const { error } = await searchParams;
+  const legacyRegistrationEnabled = isLegacyRegistrationEnabled();
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-10">
@@ -25,6 +27,16 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
         </p>
       </div>
 
+      {!legacyRegistrationEnabled ? (
+        <div className="mt-8 rounded-lg border border-blue-200 bg-white p-6">
+          <p className="text-sm leading-6 text-slate-700">
+            New Experts accounts are now created through the shared SyncForge login.
+          </p>
+          <a href="/api/auth/signin" className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800">
+            Continue with SyncForge
+          </a>
+        </div>
+      ) : (
       <form action={signUpAction} className="mt-8 space-y-5 rounded-lg border border-slate-200 bg-white p-6">
         {error ? (
           <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
@@ -72,6 +84,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
           Create account
         </button>
       </form>
+      )}
 
       <p className="mt-5 text-center text-sm text-slate-600">
         Already have an account?{" "}
