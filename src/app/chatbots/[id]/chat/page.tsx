@@ -5,6 +5,10 @@ import { ArrowLeft } from "lucide-react";
 import { ChatInterface } from "@/components/ChatInterface";
 import { requireUser } from "@/lib/auth";
 import { getSuggestedQuestions } from "@/lib/chatbotTemplates";
+import {
+  getConversationActivityAt,
+  sortConversationsByRecentActivity,
+} from "@/lib/conversations";
 import { db } from "@/lib/db";
 
 type ChatPageProps = {
@@ -41,8 +45,14 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
     include: {
       conversations: {
         where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-        include: { _count: { select: { messages: true } } },
+        include: {
+          _count: { select: { messages: true } },
+          messages: {
+            where: { userId: user.id },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
       },
       _count: { select: { documents: true, chunks: true } },
     },
@@ -82,10 +92,11 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
       <ChatInterface
         key={selectedConversation?.id ?? "new-conversation"}
         chatbotId={chatbot.id}
-        conversations={chatbot.conversations.map((conversation) => ({
+        conversations={sortConversationsByRecentActivity(chatbot.conversations).map((conversation) => ({
           id: conversation.id,
           title: conversation.title,
           createdAt: conversation.createdAt,
+          activityAt: getConversationActivityAt(conversation),
           messageCount: conversation._count.messages,
         }))}
         initialConversationId={selectedConversation?.id ?? ""}

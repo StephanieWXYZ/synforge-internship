@@ -89,6 +89,76 @@ describe("chat route isolation", () => {
     expect(mocks.generateChatAnswer).not.toHaveBeenCalled();
   });
 
+  it("does not create an empty conversation when the question is blank", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          chatbotId: "chatbot-b",
+          question: "   ",
+        }),
+      }),
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      error: "chatbotId and question are required.",
+    });
+    expect(response.status).toBe(400);
+    expect(mocks.conversationCreate).not.toHaveBeenCalled();
+    expect(mocks.messageCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates a conversation only when the first message is sent", async () => {
+    mocks.conversationCreate.mockResolvedValue({ id: "conversation-new" });
+    mocks.retrieveRelevantChunks.mockResolvedValue([]);
+    mocks.messageCreate
+      .mockResolvedValueOnce({
+        id: "user-message-1",
+        conversationId: "conversation-new",
+        role: "user",
+        content: "What fees are mentioned?",
+      })
+      .mockResolvedValueOnce({
+        id: "assistant-message-1",
+        conversationId: "conversation-new",
+        role: "assistant",
+        content: "I don't have enough information in the uploaded documents to answer that.",
+      });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          chatbotId: "chatbot-b",
+          question: "What fees are mentioned?",
+        }),
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      conversationId: "conversation-new",
+      userMessage: {
+        id: "user-message-1",
+        role: "user",
+        content: "What fees are mentioned?",
+      },
+      message: {
+        id: "assistant-message-1",
+        role: "assistant",
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.conversationCreate).toHaveBeenCalledWith({
+      data: {
+        userId: "user-1",
+        chatbotId: "chatbot-b",
+        title: "What fees are mentioned?",
+      },
+    });
+    expect(mocks.findConversationForChatbot).not.toHaveBeenCalled();
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(2);
+  });
+
   it("retries an existing user message without creating a duplicate user message", async () => {
     mocks.messageFindFirst.mockResolvedValue({
       id: "user-message-1",
@@ -146,5 +216,6 @@ describe("chat route isolation", () => {
     expect(mocks.messageCreate).not.toHaveBeenCalledWith({
       data: expect.objectContaining({ role: "user" }),
     });
+    expect(mocks.conversationCreate).not.toHaveBeenCalled();
   });
 });

@@ -30,6 +30,7 @@ type ConversationSummary = {
   id: string;
   title: string;
   createdAt: Date;
+  activityAt: Date;
   messageCount: number;
 };
 
@@ -236,7 +237,7 @@ export function ChatInterface({
                 <span className="line-clamp-2 font-medium">{conversation.title}</span>
                 <span className="mt-1 block text-xs text-slate-500">
                   {conversation.messageCount} messages ·{" "}
-                  {conversation.createdAt.toLocaleDateString()}
+                  {conversation.activityAt.toLocaleDateString()}
                 </span>
               </Link>
             ))
