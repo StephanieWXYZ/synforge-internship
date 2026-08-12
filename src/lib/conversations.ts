@@ -4,6 +4,18 @@ export type ConversationListItem = {
   messages?: Array<{ createdAt: Date }>;
 };
 
+export const CONVERSATION_TITLE_MAX_LENGTH = 60;
+
+export function createConversationTitle(firstUserMessage: string) {
+  const normalizedMessage = firstUserMessage.trim().replace(/\s+/g, " ");
+
+  if (normalizedMessage.length <= CONVERSATION_TITLE_MAX_LENGTH) {
+    return normalizedMessage;
+  }
+
+  return normalizedMessage.slice(0, CONVERSATION_TITLE_MAX_LENGTH).trimEnd();
+}
+
 export function getConversationActivityAt(conversation: ConversationListItem) {
   return conversation.messages?.[0]?.createdAt ?? conversation.createdAt;
 }

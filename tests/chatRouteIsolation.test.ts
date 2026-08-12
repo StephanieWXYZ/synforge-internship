@@ -159,6 +159,119 @@ describe("chat route isolation", () => {
     expect(mocks.messageCreate).toHaveBeenCalledTimes(2);
   });
 
+  it("saves user and assistant messages with assistant sources", async () => {
+    mocks.conversationCreate.mockResolvedValue({ id: "conversation-new" });
+    mocks.retrieveRelevantChunks.mockResolvedValue([
+      {
+        chunkId: "chunk-1",
+        documentId: "document-1",
+        fileName: "lease.txt",
+        chunkIndex: 0,
+        content: "The tenant must give 60 days written notice before ending the lease early.",
+        score: 0.92,
+      },
+    ]);
+    mocks.generateChatAnswer.mockResolvedValue(
+      "The tenant must give 60 days written notice before ending the lease early.",
+    );
+    mocks.messageCreate
+      .mockResolvedValueOnce({
+        id: "user-message-1",
+        conversationId: "conversation-new",
+        role: "user",
+        content: "What notice is required?",
+      })
+      .mockResolvedValueOnce({
+        id: "assistant-message-1",
+        conversationId: "conversation-new",
+        role: "assistant",
+        content: "The tenant must give 60 days written notice before ending the lease early.",
+      });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          chatbotId: "chatbot-b",
+          question: "What notice is required?",
+        }),
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      conversationId: "conversation-new",
+      sources: [
+        expect.objectContaining({
+          fileName: "lease.txt",
+          chunkIndex: 0,
+          score: 0.92,
+        }),
+      ],
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.messageCreate).toHaveBeenNthCalledWith(1, {
+      data: {
+        userId: "user-1",
+        conversationId: "conversation-new",
+        role: "user",
+        content: "What notice is required?",
+      },
+    });
+    expect(mocks.messageCreate).toHaveBeenNthCalledWith(2, {
+      data: {
+        userId: "user-1",
+        conversationId: "conversation-new",
+        role: "assistant",
+        content: "The tenant must give 60 days written notice before ending the lease early.",
+        sourcesJson: expect.stringContaining("lease.txt"),
+      },
+    });
+  });
+
+  it("preserves the saved user message for retry when assistant generation fails", async () => {
+    mocks.conversationCreate.mockResolvedValue({ id: "conversation-new" });
+    mocks.retrieveRelevantChunks.mockResolvedValue([
+      {
+        chunkId: "chunk-1",
+        documentId: "document-1",
+        fileName: "lease.txt",
+        chunkIndex: 0,
+        content: "The monthly rent amount is $2,000.",
+        score: 0.9,
+      },
+    ]);
+    mocks.generateChatAnswer.mockRejectedValue(new Error("provider failed"));
+    mocks.messageCreate.mockResolvedValueOnce({
+      id: "user-message-1",
+      conversationId: "conversation-new",
+      role: "user",
+      content: "How much is rent?",
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          chatbotId: "chatbot-b",
+          question: "How much is rent?",
+        }),
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Assistant response failed. Please retry.",
+      conversationId: "conversation-new",
+      retryMessageId: "user-message-1",
+      userMessage: {
+        id: "user-message-1",
+        role: "user",
+        content: "How much is rent?",
+      },
+    });
+    expect(response.status).toBe(500);
+    expect(mocks.messageCreate).toHaveBeenCalledTimes(1);
+  });
+
   it("retries an existing user message without creating a duplicate user message", async () => {
     mocks.messageFindFirst.mockResolvedValue({
       id: "user-message-1",
