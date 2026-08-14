@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { authenticationErrorResponse, requireApiUser } from "@/lib/auth";
+import { createConversationTitle } from "@/lib/conversations";
 import { db } from "@/lib/db";
 import { generateChatAnswer } from "@/lib/llm";
 import { buildRagResponse } from "@/lib/rag";
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
         data: {
           userId: user.id,
           chatbotId,
-          title: question.slice(0, 80),
+          title: createConversationTitle(question),
         },
       });
       conversationId = conversation.id;

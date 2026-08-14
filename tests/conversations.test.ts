@@ -1,11 +1,28 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CONVERSATION_TITLE_MAX_LENGTH,
+  createConversationTitle,
   getConversationActivityAt,
   sortConversationsByRecentActivity,
 } from "@/lib/conversations";
 
 describe("conversation list helpers", () => {
+  it("creates a readable deterministic title from the first user message", () => {
+    expect(createConversationTitle("   What fees   or penalties are mentioned?   ")).toBe(
+      "What fees or penalties are mentioned?",
+    );
+  });
+
+  it("truncates long conversation titles without using a model request", () => {
+    const title = createConversationTitle(
+      "Summarize every maintenance requirement, inspection deadline, escalation step, and safety warning in this operating procedure.",
+    );
+
+    expect(title.length).toBeLessThanOrEqual(CONVERSATION_TITLE_MAX_LENGTH);
+    expect(title).toBe("Summarize every maintenance requirement, inspection deadline");
+  });
+
   it("uses the latest message date as the conversation activity date", () => {
     const latestMessage = new Date("2026-02-05T12:00:00Z");
     const conversation = {
