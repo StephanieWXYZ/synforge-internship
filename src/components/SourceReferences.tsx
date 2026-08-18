@@ -1,10 +1,7 @@
+import type { SourceReference } from "@/lib/rag";
+
 type SourceReferencesProps = {
-  sources: Array<{
-    fileName: string;
-    chunkIndex: number;
-    preview?: string;
-    score?: number;
-  }>;
+  sources: SourceReference[];
 };
 
 function formatScore(score?: number) {
@@ -29,7 +26,7 @@ export function SourceReferences({ sources }: SourceReferencesProps) {
       <p className="text-xs font-semibold uppercase text-slate-500">Sources</p>
       {sources.map((source, index) => (
         <details
-          key={`${source.fileName}-${source.chunkIndex}-${index}`}
+          key={`${source.chunkId}-${index}`}
           className="break-words rounded-md border border-slate-200 bg-white text-xs text-slate-600"
         >
           <summary className="cursor-pointer list-none px-3 py-2 font-medium">
@@ -38,7 +35,9 @@ export function SourceReferences({ sources }: SourceReferencesProps) {
             {formatScore(source.score) ? (
               <>
                 {" "}
-                <span className="ml-2 text-slate-500">score {formatScore(source.score)}</span>
+                <span className="ml-2 text-slate-500">
+                  retrieval score {formatScore(source.score)}
+                </span>
               </>
             ) : null}
           </summary>

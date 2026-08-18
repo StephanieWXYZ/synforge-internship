@@ -202,7 +202,9 @@ describe("chat route isolation", () => {
       conversationId: "conversation-new",
       sources: [
         expect.objectContaining({
+          documentId: "document-1",
           fileName: "lease.txt",
+          chunkId: "chunk-1",
           chunkIndex: 0,
           score: 0.92,
         }),
@@ -223,7 +225,7 @@ describe("chat route isolation", () => {
         conversationId: "conversation-new",
         role: "assistant",
         content: "The tenant must give 60 days written notice before ending the lease early.",
-        sourcesJson: expect.stringContaining("lease.txt"),
+        sourcesJson: expect.stringContaining("chunk-1"),
       },
     });
   });

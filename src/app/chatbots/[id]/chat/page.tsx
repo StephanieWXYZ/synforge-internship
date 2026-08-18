@@ -10,31 +10,12 @@ import {
   sortConversationsByRecentActivity,
 } from "@/lib/conversations";
 import { db } from "@/lib/db";
+import { parseSourceReferences } from "@/lib/rag";
 
 type ChatPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ conversation?: string }>;
 };
-
-type MessageSource = {
-  fileName: string;
-  chunkIndex: number;
-  preview?: string;
-  score?: number;
-};
-
-function parseSources(sourcesJson: string | null): MessageSource[] {
-  if (!sourcesJson) {
-    return [];
-  }
-
-  try {
-    const sources = JSON.parse(sourcesJson);
-    return Array.isArray(sources) ? sources : [];
-  } catch {
-    return [];
-  }
-}
 
 export default async function ChatPage({ params, searchParams }: ChatPageProps) {
   const user = await requireUser();
@@ -105,7 +86,7 @@ export default async function ChatPage({ params, searchParams }: ChatPageProps) 
             id: message.id,
             role: message.role === "assistant" ? "assistant" : "user",
             content: message.content,
-            sources: parseSources(message.sourcesJson),
+            sources: parseSourceReferences(message.sourcesJson),
           })) ?? []
         }
         suggestedQuestions={getSuggestedQuestions(chatbot.name, chatbot.domain)}
