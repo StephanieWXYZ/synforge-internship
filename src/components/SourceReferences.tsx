@@ -16,40 +16,48 @@ export function SourceReferences({ sources }: SourceReferencesProps) {
   if (sources.length === 0) {
     return (
       <div className="mt-3 border-t border-slate-200 pt-3">
-        <p className="text-xs text-slate-500">No source references for this response.</p>
+        <p className="text-xs text-slate-500">No source references saved for this response.</p>
       </div>
     );
   }
 
   return (
     <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
-      <p className="text-xs font-semibold uppercase text-slate-500">Sources</p>
-      {sources.map((source, index) => (
+      <p className="text-xs font-semibold uppercase text-slate-500">
+        Source references ({sources.length})
+      </p>
+      {sources.map((source) => (
         <details
-          key={`${source.chunkId}-${index}`}
-          className="break-words rounded-md border border-slate-200 bg-white text-xs text-slate-600"
+          key={source.chunkId}
+          className="group rounded-md border border-slate-200 bg-white text-xs text-slate-600"
         >
-          <summary className="cursor-pointer list-none px-3 py-2 font-medium">
-            <span className="mr-2">{source.fileName}</span>{" "}
-            <span className="text-slate-500">chunk {source.chunkIndex + 1}</span>
-            {formatScore(source.score) ? (
-              <>
-                {" "}
-                <span className="ml-2 text-slate-500">
-                  retrieval score {formatScore(source.score)}
-                </span>
-              </>
-            ) : null}
+          <summary className="flex cursor-pointer list-none flex-col gap-2 px-3 py-2 font-medium sm:flex-row sm:items-center sm:justify-between">
+            <span className="min-w-0">
+              <span className="block truncate text-slate-700 sm:inline">{source.fileName}</span>{" "}
+              <span className="text-slate-500">chunk {source.chunkIndex + 1}</span>
+              {formatScore(source.score) ? (
+                <>
+                  {" "}
+                  <span className="text-slate-500">
+                    retrieval score {formatScore(source.score)}
+                  </span>
+                </>
+              ) : null}
+            </span>
+            <span className="shrink-0 text-blue-700">
+              <span className="group-open:hidden">Show preview</span>
+              <span className="hidden group-open:inline">Hide preview</span>
+            </span>
           </summary>
-          {source.preview ? (
-            <p className="border-t border-slate-100 px-3 py-2 leading-5 text-slate-500">
-              {source.preview}
-            </p>
-          ) : (
-            <p className="border-t border-slate-100 px-3 py-2 leading-5 text-slate-500">
-              No preview saved for this source.
-            </p>
-          )}
+          <div className="border-t border-slate-100 px-3 py-2">
+            {source.preview ? (
+              <p className="max-h-32 overflow-y-auto whitespace-pre-wrap break-words leading-5 text-slate-500">
+                {source.preview}
+              </p>
+            ) : (
+              <p className="leading-5 text-slate-500">No preview saved for this source.</p>
+            )}
+          </div>
         </details>
       ))}
     </div>
