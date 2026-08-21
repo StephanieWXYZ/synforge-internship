@@ -6,19 +6,13 @@ import { useRouter } from "next/navigation";
 import { MessageSquarePlus, Send } from "lucide-react";
 
 import { SourceReferences } from "@/components/SourceReferences";
-
-type Source = {
-  fileName: string;
-  chunkIndex: number;
-  preview?: string;
-  score?: number;
-};
+import type { SourceReference } from "@/lib/rag";
 
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  sources?: Source[];
+  sources?: SourceReference[];
 };
 
 type FailedResponse = {
@@ -89,7 +83,7 @@ export function ChatInterface({
         userMessage?: { id: string; role: "user"; content: string };
         retryMessageId?: string;
         message?: { id: string; role: "assistant"; content: string };
-        sources?: Source[];
+        sources?: SourceReference[];
       };
 
       const nextConversationId = data.conversationId ?? conversationId;
@@ -172,7 +166,7 @@ export function ChatInterface({
         error?: string;
         conversationId?: string;
         message?: { id: string; role: "assistant"; content: string };
-        sources?: Source[];
+        sources?: SourceReference[];
       };
 
       if (!response.ok || !data.message) {

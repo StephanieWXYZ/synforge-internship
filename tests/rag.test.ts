@@ -6,6 +6,7 @@ import {
   buildRagResponse,
   buildSourcePreview,
   NO_ANSWER_FALLBACK,
+  parseSourceReferences,
 } from "@/lib/rag";
 import type { RetrievedChunk } from "@/lib/retrieval";
 
@@ -46,9 +47,28 @@ describe("buildRagResponse", () => {
       answer: "The monthly rent amount is $2,000.",
       sources: [
         {
+          documentId: "doc-a",
           fileName: "sample-lease.txt",
+          chunkId: "chunk-a",
           chunkIndex: 2,
           preview: chunk.content,
+          score: 0.82,
+        },
+      ],
+    });
+  });
+
+  it("deduplicates repeated retrieved chunks", async () => {
+    await expect(
+      buildRagResponse(
+        [chunk, { ...chunk, score: 0.8 }],
+        vi.fn().mockResolvedValue("The monthly rent amount is $2,000."),
+      ),
+    ).resolves.toMatchObject({
+      sources: [
+        {
+          documentId: "doc-a",
+          chunkId: "chunk-a",
           score: 0.82,
         },
       ],
@@ -75,5 +95,93 @@ describe("RAG prompt helpers", () => {
 
     expect(preview.length).toBeLessThanOrEqual(220);
     expect(preview.endsWith("...")).toBe(true);
+  });
+});
+
+describe("parseSourceReferences", () => {
+  it("returns an empty list for old messages without sources", () => {
+    expect(parseSourceReferences(null)).toEqual([]);
+    expect(parseSourceReferences("not json")).toEqual([]);
+    expect(parseSourceReferences(JSON.stringify({ fileName: "lease.txt" }))).toEqual([]);
+  });
+
+  it("restores stored source references using the shared contract", () => {
+    expect(
+      parseSourceReferences(
+        JSON.stringify([
+          {
+            documentId: "doc-a",
+            fileName: "lease.txt",
+            chunkId: "chunk-a",
+            chunkIndex: 0,
+            preview: "The monthly rent amount is $2,000.",
+            score: 0.91,
+          },
+        ]),
+      ),
+    ).toEqual([
+      {
+        documentId: "doc-a",
+        fileName: "lease.txt",
+        chunkId: "chunk-a",
+        chunkIndex: 0,
+        preview: "The monthly rent amount is $2,000.",
+        score: 0.91,
+      },
+    ]);
+  });
+
+  it("deduplicates repeated chunks and never exposes local file paths", () => {
+    const sources = parseSourceReferences(
+      JSON.stringify([
+        {
+          documentId: "doc-a",
+          fileName: "lease.txt",
+          filePath: "/Users/local/uploads/lease.txt",
+          chunkId: "chunk-a",
+          chunkIndex: 0,
+          preview: "Rent is due on the first day of each month.",
+          score: 0.91,
+        },
+        {
+          documentId: "doc-a",
+          fileName: "lease.txt",
+          chunkId: "chunk-a",
+          chunkIndex: 0,
+          preview: "Duplicate source.",
+          score: 0.9,
+        },
+      ]),
+    );
+
+    expect(sources).toEqual([
+      {
+        documentId: "doc-a",
+        fileName: "lease.txt",
+        chunkId: "chunk-a",
+        chunkIndex: 0,
+        preview: "Rent is due on the first day of each month.",
+        score: 0.91,
+      },
+    ]);
+    expect(JSON.stringify(sources)).not.toContain("filePath");
+    expect(JSON.stringify(sources)).not.toContain("/Users/local/uploads/lease.txt");
+  });
+
+  it("limits restored previews", () => {
+    const [source] = parseSourceReferences(
+      JSON.stringify([
+        {
+          documentId: "doc-a",
+          fileName: "lease.txt",
+          chunkId: "chunk-a",
+          chunkIndex: 0,
+          preview: "Rent is due monthly. ".repeat(20),
+        },
+      ]),
+    );
+
+    expect(source.preview.length).toBeLessThanOrEqual(220);
+    expect(source.preview.endsWith("...")).toBe(true);
   });
 });

@@ -84,7 +84,16 @@ describe("chat page conversations", () => {
           id: "message-2",
           role: "assistant",
           content: "Coverage is described in the policy.",
-          sourcesJson: JSON.stringify([{ fileName: "policy.pdf", chunkIndex: 0 }]),
+          sourcesJson: JSON.stringify([
+            {
+              documentId: "document-b",
+              fileName: "policy.pdf",
+              chunkId: "chunk-b",
+              chunkIndex: 0,
+              preview: "Coverage is described in the policy.",
+              score: 0.88,
+            },
+          ]),
           createdAt: secondMessageAt,
         },
       ],
@@ -117,7 +126,16 @@ describe("chat page conversations", () => {
         id: "message-2",
         role: "assistant",
         content: "Coverage is described in the policy.",
-        sources: [{ fileName: "policy.pdf", chunkIndex: 0 }],
+        sources: [
+          {
+            documentId: "document-b",
+            fileName: "policy.pdf",
+            chunkId: "chunk-b",
+            chunkIndex: 0,
+            preview: "Coverage is described in the policy.",
+            score: 0.88,
+          },
+        ],
       },
     ]);
   });

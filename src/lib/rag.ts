@@ -7,11 +7,44 @@ const SOURCE_PREVIEW_MAX_LENGTH = 220;
 const SOURCE_PREVIEW_ELLIPSIS = "...";
 
 export type SourceReference = {
+  documentId: string;
   fileName: string;
+  chunkId: string;
   chunkIndex: number;
   preview: string;
-  score: number;
+  score?: number;
 };
+
+function isSourceReference(value: unknown): value is SourceReference {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const source = value as Partial<SourceReference>;
+  const hasScore = source.score === undefined || typeof source.score === "number";
+
+  return (
+    typeof source.documentId === "string" &&
+    typeof source.fileName === "string" &&
+    typeof source.chunkId === "string" &&
+    typeof source.chunkIndex === "number" &&
+    typeof source.preview === "string" &&
+    hasScore
+  );
+}
+
+function dedupeSourceReferences(sources: SourceReference[]) {
+  const seenChunkIds = new Set<string>();
+
+  return sources.filter((source) => {
+    if (seenChunkIds.has(source.chunkId)) {
+      return false;
+    }
+
+    seenChunkIds.add(source.chunkId);
+    return true;
+  });
+}
 
 export function buildSourcePreview(content: string) {
   const preview = content.replace(/\s+/g, " ").trim();
@@ -25,12 +58,50 @@ export function buildSourcePreview(content: string) {
 }
 
 export function buildSourceReferences(chunks: RetrievedChunk[]): SourceReference[] {
-  return chunks.map((chunk) => ({
-    fileName: chunk.fileName,
-    chunkIndex: chunk.chunkIndex,
-    preview: buildSourcePreview(chunk.content),
-    score: chunk.score,
-  }));
+  return dedupeSourceReferences(
+    chunks.map((chunk) => ({
+      documentId: chunk.documentId,
+      fileName: chunk.fileName,
+      chunkId: chunk.chunkId,
+      chunkIndex: chunk.chunkIndex,
+      preview: buildSourcePreview(chunk.content),
+      score: chunk.score,
+    })),
+  );
+}
+
+export function parseSourceReferences(sourcesJson: string | null): SourceReference[] {
+  if (!sourcesJson) {
+    return [];
+  }
+
+  try {
+    const parsedSources = JSON.parse(sourcesJson);
+    if (!Array.isArray(parsedSources)) {
+      return [];
+    }
+
+    const sources = parsedSources.flatMap((source): SourceReference[] => {
+      if (!isSourceReference(source)) {
+        return [];
+      }
+
+      return [
+        {
+          documentId: source.documentId,
+          fileName: source.fileName,
+          chunkId: source.chunkId,
+          chunkIndex: source.chunkIndex,
+          preview: buildSourcePreview(source.preview),
+          ...(source.score === undefined ? {} : { score: source.score }),
+        },
+      ];
+    });
+
+    return dedupeSourceReferences(sources);
+  } catch {
+    return [];
+  }
 }
 
 export function buildDocumentOnlySystemPrompt(systemPrompt: string) {
