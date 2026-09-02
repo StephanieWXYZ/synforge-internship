@@ -68,7 +68,7 @@ Unauthenticated page requests should redirect to `/sign-in`.
 
 ## Protected Server Operations
 
-The following server operations should require an authenticated user:
+The following product API routes should require an authenticated user:
 
 - `GET /api/chatbots`
 - `POST /api/chatbots`
@@ -76,8 +76,12 @@ The following server operations should require an authenticated user:
 - `POST /api/documents`
 - `POST /api/documents/upload-url`
 - `DELETE /api/documents/[id]`
-- `POST /api/documents/[id]`
+- `PATCH /api/documents/[id]`
 - `POST /api/chat`
+
+The following server action should also require an authenticated user:
+
+- `createChatbotAction`
 
 The internal document-processing route is not protected by a browser session. It
 should remain protected by worker request authentication and must receive
