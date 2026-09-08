@@ -164,15 +164,14 @@ If no relevant uploaded document context exists, the assistant says:
 - Local file storage only
 - SQLite only
 - Basic vector search in application code
-- No authentication yet
-- No role-based permissions yet
+- No team membership, chatbot sharing, or role-based permissions yet
 - No production-grade background queue yet
 - No advanced document parsing yet
 - Upload processing is synchronous during the request
 
 ## Future Improvements
 
-- Add authentication and organization-level permissions
+- Add organization-level permissions
 - Move document processing to a background queue
 - Replace JSON vector search with pgvector, Pinecone, Weaviate, Chroma, or another vector store
 - Add richer source previews and page-level PDF citations
